@@ -1,0 +1,2 @@
+const {contextBridge,ipcRenderer}=require('electron');
+contextBridge.exposeInMainWorld('notch',{state:()=>ipcRenderer.invoke('state'),toggle:(id,on)=>ipcRenderer.invoke('toggle',id,on),retry:()=>ipcRenderer.invoke('retry'),position:value=>ipcRenderer.invoke('position',value),expand:value=>ipcRenderer.send('expand',value),settings:()=>ipcRenderer.send('settings'),onState:callback=>ipcRenderer.on('state',(_event,state)=>callback(state))});
