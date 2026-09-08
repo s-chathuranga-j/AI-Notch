@@ -37,3 +37,15 @@ test('large account lists and small work areas stay within screen bounds',()=>{
     assert.ok(b.x+b.width<=small.x+small.width&&b.y+b.height<=small.y+small.height);
   }
 });
+
+test('rest, overview and account details have distinct sizes on every edge',()=>{
+ for(const edge of ['left','right','top','bottom']){
+  const rest=notchBounds(area,edge,3,false,false);
+  const overview=notchBounds(area,edge,3,true,false);
+  const detail=notchBounds(area,edge,3,true,false,true);
+  assert.equal(Math.min(rest.width,rest.height),6);
+  assert.ok(overview.width*overview.height>rest.width*rest.height);
+  assert.ok(detail.width*detail.height>overview.width*overview.height);
+  assert.equal(edge==='left'?detail.x:edge==='right'?detail.x+detail.width:edge==='top'?detail.y:detail.y+detail.height,edge==='left'?area.x:edge==='right'?area.x+area.width:edge==='top'?area.y:area.y+area.height);
+ }
+});

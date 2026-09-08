@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const {copilot} = require('./copilot.cjs');
 const path = require('node:path');
 const {spawn} = require('node:child_process');
 const syncFS = require('node:fs');
@@ -24,7 +25,7 @@ async function discover(home) {
     const dir=path.join(home,e.name);
     if(await fs.access(path.join(dir,'.credentials.json')).then(()=>true,()=>false)) claude.push({id:e.name.slice(1),label:`Claude · ${e.name.slice(8)}`,kind:'claude',dir});
   }
-  return [...claude,{id:'codex',label:'Codex',kind:'codex',dir:path.join(home,'.codex')}];
+  return [...claude,{id:'codex',label:'Codex',kind:'codex',dir:path.join(home,'.codex')},{id:'copilot',label:'GitHub Copilot',kind:'copilot'}];
 }
 async function claude(account,signal) {
   let credentials;
@@ -83,4 +84,4 @@ class Poller {
     finally{if(this.jobs.get(account.id)===controller)this.jobs.delete(account.id);}
   }
 }
-module.exports={parseClaude,parseCodex,discover,request,Poller,fetchUsage:(account,signal)=>account.kind==='claude'?claude(account,signal):codex(account,signal)};
+module.exports={parseClaude,parseCodex,discover,request,Poller,fetchUsage:(account,signal)=>account.kind==='claude'?claude(account,signal):account.kind==='codex'?codex(account,signal):account.kind==='copilot'?copilot(account,signal):Promise.reject(new Error('Unsupported provider.'))};
