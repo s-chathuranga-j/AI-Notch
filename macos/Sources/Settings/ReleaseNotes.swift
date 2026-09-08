@@ -30,9 +30,13 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.0", headline: "GitHub Copilot joins the notch.", changes: [
+            .init(title: "Copilot quotas, experimentally", detail: "A Copilot ring beside the others, read through the GitHub CLI’s login or COPILOT_GITHUB_TOKEN. Premium requests or AI credits fill the ring; chat and completions show as Unlimited."),
+            .init(title: "Only GitHub’s own endpoint", detail: "The token goes to api.github.com and nowhere else, with redirects refused. GitHub can change or refuse this internal endpoint; when it does, the ring says so instead of guessing."),
+            .init(title: "Off until you say so", detail: "Like every provider, Copilot starts switched off. Enable it in Settings after gh auth login.")
+        ]),
         ReleaseNote(version: "0.2.0", headline: "Meet AI Notch.", changes: [
             .init(title: "Your AI usage, at a glance", detail: "Usage rings and reset times for Claude Code, Cursor, Codex, Antigravity and GLM."),
-            .init(title: "GitHub Copilot, experimentally", detail: "Copilot quotas read through the GitHub CLI’s login, with reset dates and unlimited allowances shown as GitHub reports them."),
             .init(title: "Keep sessions in sight", detail: "See when your coding agents are working or waiting for you."),
             .init(title: "Make it fit your Mac", detail: "Choose any screen edge, hover to expand, and manage providers in Settings."),
             .init(title: "Private by choice", detail: "Enable only the accounts you want. Disabling an account stops its reads and monitoring. Usage responses are never written to app logs.")
