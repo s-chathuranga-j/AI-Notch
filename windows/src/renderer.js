@@ -22,12 +22,15 @@ function render(state){
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
  $('accounts').replaceChildren();$('compact').replaceChildren();
  for(const a of state.accounts){
-  const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}`);chip.type='button';
-  chip.setAttribute('aria-label',`${a.label}: ${a.enabled?a.status:'Disabled'}`);
+  const stale=!!a.stale&&a.enabled&&a.windows.length>0;
+  const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}${stale?' stale':''}`);chip.type='button';
+  chip.setAttribute('aria-label',`${a.label}: ${a.enabled?(stale?`${a.status} Showing the last reading.`:a.status):'Disabled'}`);
   chip.setAttribute('aria-controls','accounts');chip.dataset.account=a.id;
   chip.onmouseenter=()=>showDetail(a.id);chip.onfocus=()=>showDetail(a.id);chip.onclick=()=>showDetail(a.id);
-  chip.append(logo(a.kind),text('span',usageSummary(a)));$('compact').append(chip);
-  const row=text('article','');row.dataset.account=a.id;row.dataset.provider=a.kind;
+  chip.append(logo(a.kind),text('span',usageSummary(a)));
+  if(stale)chip.append(text('span','⚠','warn'));
+  $('compact').append(chip);
+  const row=text('article','',stale?'stale':undefined);row.dataset.account=a.id;row.dataset.provider=a.kind;
   const title=text('div','','title');const identity=text('div','','account-identity');
   identity.append(logo(a.kind),text('strong',a.label));title.append(identity);
   if(state.settings){const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=a.enabled;toggle.setAttribute('aria-label',`Enable ${a.label}`);toggle.onchange=()=>window.notch.toggle(a.id,toggle.checked);title.append(toggle);}
@@ -38,7 +41,10 @@ function render(state){
     if(!w.unlimited){const progress=document.createElement('progress');progress.setAttribute('aria-label',`${a.label} ${w.label} usage`);progress.max=100;progress.value=Math.max(0,Math.min(100,w.percent));line.append(progress);}
     row.append(line);if(w.reset)row.append(text('small',`Resets ${new Date(w.reset).toLocaleString()}`));
    }
-   row.append(text('small',a.status==='Updated'?`Updated ${new Date(a.updated).toLocaleTimeString()}`:a.status,'status'));
+   if(stale){
+    row.append(text('small',`⚠ Not up to date. ${a.status}`,'status stale'));
+    if(a.updated)row.append(text('small',`Showing the last reading, from ${new Date(a.updated).toLocaleTimeString()}.`,'status'));
+   }else row.append(text('small',a.status==='Updated'?`Updated ${new Date(a.updated).toLocaleTimeString()}`:a.status,'status'));
   }else row.append(text('small','Disabled · enable in settings'));
   $('accounts').append(row);
  }

@@ -1,12 +1,18 @@
-# AI Notch for Windows v0.2.0 — Preview
+# AI Notch for Windows v0.3.0 — Preview
 
-The Windows notch now rests as a thin black tab. Hover to reveal subscription logos and usage percentages, then hover a provider to see that account's details.
+Claude usage now reads correctly on plans that do not use session and weekly windows, and a reading that cannot be refreshed stays on screen instead of disappearing.
 
-- Added the macOS-style settings interaction: a subtle arc reveals a gear on hover; click to open settings.
-- Preserved vertical provider layouts on the left and right edges, with details opening inward.
-- Reduced margins and resting thickness to 6 logical pixels, and removed square shadows around rounded corners.
-- Added experimental GitHub Copilot quota support, its logo, reset dates, and unlimited-quota display alongside Claude and Codex.
-- Added regression coverage for hover transitions, screen-edge layout, Copilot quota parsing, cancellation, and credential handling.
+- Read Claude's `limits` array, the forward-compatible shape the macOS app already used, so newer limit kinds such as Opus and Sonnet weeks appear as Anthropic adds them.
+- Kept the named `five_hour` and `seven_day` windows merged in, since a window leaves `limits` the moment its reset passes.
+- Added a Credits reading for plans billed on usage credits, including enterprise accounts, which report no rate-limit windows at all. These previously failed with "Claude returned no usage windows".
+- Kept the last successful reading visible when a refresh fails, marked with a warning sign, the reason, and the time the reading was taken. Rate limits and transient errors no longer blank the percentage.
+- Discarded the cached reading when an account is disabled, so it cannot reappear on re-enable.
+
+This release also carries the in-progress Windows work merged alongside it:
+
+- Added a visibility preference (On hover, Always, Hidden) in settings, saved with the screen edge. Always keeps the overview open and never collapses on pointer leave; Hidden takes the window off screen and ignores the mouse, with the tray as the way back.
+- Tray click now opens Settings, and "Show AI Notch" expands the notch.
+- Tolerated rotated Claude credentials: a UTF-8 byte order mark is stripped, known wrapper shapes are accepted when an access token is present, the missing-file error names the profile folder, and a zero or missing `expiresAt` is treated as unknown so Anthropic validates the token rather than a local check rejecting it.
 
 ## Downloads
 
@@ -14,12 +20,14 @@ Choose the x64 ZIP for most Intel/AMD Windows PCs, or the ARM64 ZIP for Windows 
 
 This remains an unsigned portable preview. No macOS code or release artifacts are changed.
 
-## Copilot setup and limitations
+## Notes and limitations
 
-Providers are disabled by default. For Copilot, sign in through the native GitHub CLI using `gh auth login`, then enable it in AI Notch settings. The app tries the active github.com account, or a compatible `COPILOT_GITHUB_TOKEN` supplied in its launch environment. Some GitHub CLI credentials may not have access to Copilot quotas.
+An account with no successful reading yet shows the failure reason alone, never a placeholder number. The cached reading is held only in memory, so it does not survive a restart; nothing new is written to disk.
 
-Copilot uses GitHub's internal entitlement endpoint, which may change or deny access. Live Copilot authentication and usage retrieval have not been verified with a real subscription. Missing data is reported explicitly; sample data is used only when launched with `--demo`. VS Code credentials and browser sessions are not read.
+Credit-billed plans report spend against a monthly limit with no reset date, so the Credits row shows a percentage without a reset time. Undocumented code-named fields in the usage response are ignored rather than guessed at.
+
+There is no backoff after a rate limit; the app continues its two-minute refresh.
 
 ## Validation
 
-All 18 Windows tests and JavaScript syntax checks pass. Release packages are built for x64 and ARM64. ARM64 execution, live provider authentication, and full desktop hover/visual verification remain unverified in this release environment.
+All 29 Windows tests pass, including new coverage for the `limits` array, credit-billed plans, stale-reading display, cache handling on disable, and the Always visibility mode. The x64 package was installed and run on Windows 11, where the Claude reading was verified against a live enterprise account. ARM64 execution remains unverified in this release environment.

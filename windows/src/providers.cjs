@@ -4,10 +4,27 @@ const path = require('node:path');
 const {spawn} = require('node:child_process');
 const syncFS = require('node:fs');
 const hosts = new Set(['api.anthropic.com']);
+const claudeLabels={session:'Session',weekly_all:'Weekly',weekly_opus:'Opus',weekly_sonnet:'Sonnet'};
+function claudeLabel(kind){return claudeLabels[kind] || kind.replace(/^weekly_/,'').replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());}
+// Session first, then the all-model week, then everything else - the order the notch reads in.
+function claudeRank(id){return id==='session'?0:id==='weekly_all'?1:id==='credits'?3:2;}
 function parseClaude(data) {
-  return [['five_hour','Session'],['seven_day','Weekly']].flatMap(([key,label]) => {
-    const w=data[key]; return w && typeof w.utilization==='number' && Number.isFinite(w.utilization) ? [{label,percent:w.utilization,reset:w.resets_at || null}] : [];
-  });
+  const windows=[]; const seen=new Set();
+  const add=(id,label,percent,reset)=>{
+    if(seen.has(id) || typeof percent!=='number' || !Number.isFinite(percent)) return;
+    seen.add(id); windows.push({id,label,percent,reset:reset || null});
+  };
+  // `limits` grows new kinds as Anthropic adds them, so it is preferred over the named windows.
+  for(const limit of Array.isArray(data?.limits)?data.limits:[]) if(limit && typeof limit.kind==='string') add(limit.kind,claudeLabel(limit.kind),limit.percent,limit.resets_at);
+  // The named windows are merged in rather than used only as a fallback: an entry leaves
+  // `limits` once its reset passes, while `five_hour` still carries it.
+  add('session','Session',data?.five_hour?.utilization,data?.five_hour?.resets_at);
+  add('weekly_all','Weekly',data?.seven_day?.utilization,data?.seven_day?.resets_at);
+  // Plans billed on credits rather than rate-limit windows report only their spend.
+  const extra=data?.extra_usage;
+  if(extra && extra.is_enabled!==false) add('credits','Credits',extra.utilization,null);
+  if(data?.spend?.enabled!==false) add('credits','Credits',data?.spend?.percent,null);
+  return windows.sort((a,b)=>claudeRank(a.id)-claudeRank(b.id) || (a.id<b.id?-1:a.id>b.id?1:0)).map(({id,...w})=>w);
 }
 async function request(url,token,signal) {
   const u=new URL(url);
@@ -81,11 +98,17 @@ function codex(account,signal) {
   });
 }
 class Poller {
-  constructor(fetcher,publish){this.fetcher=fetcher;this.publish=publish;this.jobs=new Map();this.enabled=new Set();}
-  disable(id){this.enabled.delete(id);this.jobs.get(id)?.abort();this.jobs.delete(id);this.publish(id,{status:'Disabled',windows:[]});}
+  constructor(fetcher,publish){this.fetcher=fetcher;this.publish=publish;this.jobs=new Map();this.enabled=new Set();this.last=new Map();}
+  // Disabling drops the cached reading with everything else, so it cannot reappear on re-enable.
+  disable(id){this.enabled.delete(id);this.jobs.get(id)?.abort();this.jobs.delete(id);this.last.delete(id);this.publish(id,{status:'Disabled',windows:[]});}
   async refresh(account){if(!this.enabled.has(account.id)||this.jobs.has(account.id))return;const controller=new AbortController();this.jobs.set(account.id,controller);
-    try{const windows=await this.fetcher(account,controller.signal);if(this.jobs.get(account.id)===controller && this.enabled.has(account.id))this.publish(account.id,{status:'Updated',windows,updated:Date.now()});}
-    catch(error){if(!controller.signal.aborted && this.jobs.get(account.id)===controller)this.publish(account.id,{status:error.message,windows:[]});}
+    try{const windows=await this.fetcher(account,controller.signal);if(this.jobs.get(account.id)===controller && this.enabled.has(account.id)){const row={status:'Updated',windows,updated:Date.now()};this.last.set(account.id,row);this.publish(account.id,row);}}
+    catch(error){if(!controller.signal.aborted && this.jobs.get(account.id)===controller){
+      // A failed refresh keeps the last reading rather than blanking it. The row is marked stale so
+      // the frame can say the number is old; a reading was never invented for an account that has none.
+      const cached=this.last.get(account.id);
+      this.publish(account.id,cached&&cached.windows.length?{...cached,status:error.message,stale:true}:{status:error.message,windows:[]});
+    }}
     finally{if(this.jobs.get(account.id)===controller)this.jobs.delete(account.id);}
   }
 }

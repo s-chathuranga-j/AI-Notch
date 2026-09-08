@@ -41,3 +41,19 @@ test('Always visibility keeps the overview open when the pointer leaves',()=>{
  assert.ok(!ui.calls.some(([name,value])=>name==='expand'&&value===false));
  ui.push({...ui.state,visibility:'onHover'});ui.leave();assert.ok(!ui.body.classes.has('expanded'));
 });
+test('a stale reading is still shown, flagged as out of date rather than blanked',()=>{
+ const ui=setup();
+ const stale={...ui.state,accounts:ui.state.accounts.map((a,i)=>i===0?{...a,status:'Provider rate limit. Retry in a few minutes.',stale:true,updated:0}:a)};
+ ui.push(stale);
+ const chip=ui.ids.compact.children[0];
+ assert.ok(chip.className.includes('stale'));
+ assert.equal(chip.children[1].textContent,'25%','the cached percentage is still displayed');
+ assert.equal(chip.children[2].textContent,'⚠');
+ assert.match(chip.attributes['aria-label'],/rate limit.*last reading/i);
+ const row=ui.ids.accounts.children[0];
+ assert.equal(row.className,'stale');
+ const notices=row.children.filter(c=>c.className&&c.className.includes('status')).map(c=>c.textContent);
+ assert.match(notices[0],/^⚠ Not up to date\. Provider rate limit/);
+ assert.ok(!ui.ids.accounts.children[1].className,'a healthy account is not flagged');
+ assert.ok(!ui.ids.compact.children[1].className.includes('stale'));
+});

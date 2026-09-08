@@ -1,6 +1,6 @@
 # AI Notch for Windows
 
-A tray application with a thin black notch at any screen edge. Hover to reveal logos and percentages, then hover a logo for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.2.0 release notes](RELEASE-NOTES.md).
+A tray application with a thin black notch at any screen edge. Hover to reveal logos and percentages, then hover a logo for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.0 release notes](RELEASE-NOTES.md).
 
 ## Run on Windows
 
@@ -18,7 +18,9 @@ claude
 
 Restart AI Notch. The work profile appears separately and requires its own enable switch. To return the terminal to the default personal profile, run `Remove-Item Env:CLAUDE_CONFIG_DIR`. Additional `.claude-NAME` folders with credential files are discovered in the same way. Custom paths outside these home-directory profiles and multiple Codex profiles are not yet configurable.
 
-Usage refreshes every two minutes. Expired logins produce an explicit sign-in instruction, not an indefinite waiting indicator. Right-click the tray icon to refresh, show settings, or quit.
+Claude reports session and weekly windows for subscription plans. Plans billed on usage credits, including enterprise accounts, report no such windows; those show a single Credits reading taken from the reported spend against the monthly limit, with no reset date. Newer limit kinds are read from the response's `limits` array as Anthropic adds them.
+
+Usage refreshes every two minutes. When a refresh fails, the last reading stays on screen with a warning sign and the reason, rather than disappearing; the account details give the time that reading was taken. An account that has not yet had a successful reading shows the reason alone, never a placeholder number. Expired logins produce an explicit sign-in instruction, not an indefinite waiting indicator. Right-click the tray icon to refresh, show settings, or quit.
 
 ## Development on a Mac
 
@@ -37,7 +39,7 @@ Implemented: experimental GitHub Copilot quotas, Claude OAuth usage, discovered 
 
 ## Privacy
 
-Only account enablement and screen edge are saved in Electron's local user-data `settings.json`. Credentials and quota responses stay in memory; neither is logged or saved. Claude requests go exclusively to `https://api.anthropic.com/api/oauth/usage`, with redirects forbidden. Codex CLI manages its own network access and authentication. Copilot reads `COPILOT_GITHUB_TOKEN` or runs `gh auth token --hostname github.com` locally, then calls only `https://api.github.com/copilot_internal/user`, with redirects forbidden. Tokens remain in the main process and are never passed as command-line arguments or sent to the renderer. Disabling an account cancels its work and rejects late results. The sandboxed renderer has no Node access and cannot make network requests. Narrow IPC exposes only preferences and sanitized usage, never tokens. No analytics, publisher service, updater, browser-cookie extraction, or token refresh is included.
+Only account enablement and screen edge are saved in Electron's local user-data `settings.json`. Credentials and quota responses stay in memory; neither is logged or saved. The most recent reading for an enabled account is held in memory so a failed refresh can show it as stale, and is discarded when the account is disabled or the app quits. Claude requests go exclusively to `https://api.anthropic.com/api/oauth/usage`, with redirects forbidden. Codex CLI manages its own network access and authentication. Copilot reads `COPILOT_GITHUB_TOKEN` or runs `gh auth token --hostname github.com` locally, then calls only `https://api.github.com/copilot_internal/user`, with redirects forbidden. Tokens remain in the main process and are never passed as command-line arguments or sent to the renderer. Disabling an account cancels its work and rejects late results. The sandboxed renderer has no Node access and cannot make network requests. Narrow IPC exposes only preferences and sanitized usage, never tokens. No analytics, publisher service, updater, browser-cookie extraction, or token refresh is included.
 
 The Electron runtime and build tools are additional dependencies compared with the native Mac implementation. Dependency updates should be reviewed before future releases.
 
