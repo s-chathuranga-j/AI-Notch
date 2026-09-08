@@ -1,15 +1,13 @@
 const {app,BrowserWindow,Tray,Menu,nativeImage,ipcMain,screen,session}=require('electron');
 const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');
 const {discover,Poller,fetchUsage}=require('./providers.cjs');
+const {notchBounds}=require('./layout.cjs');
 const demo=process.platform!=='win32'||process.argv.includes('--demo');
 let win,tray,accounts=[],config={enabled:[],position:'top'},rows={},settings=false,expanded=false;
 const poller=new Poller(demo?async account=>[{label:'Session',percent:account.kind==='claude'?37:62,reset:new Date(Date.now()+7200000).toISOString()},{label:'Weekly',percent:21,reset:null}]:fetchUsage,(id,row)=>{rows[id]=row;push();});
 function state(){return {demo,settings,position:config.position,accounts:accounts.map(({id,label,kind})=>({id,label,kind,enabled:poller.enabled.has(id),...(rows[id]||{status:'Disabled',windows:[]})}))};}
 function push(){if(win&&!win.isDestroyed())win.webContents.send('state',state());}
-function place(){if(!win)return;const area=screen.getPrimaryDisplay().workArea;const width=settings?520:expanded?420:260;const height=settings?640:expanded?Math.min(640,140+accounts.length*130):64;
- const x=config.position==='left'?area.x:config.position==='right'?area.x+area.width-width:area.x+Math.round((area.width-width)/2);
- const y=config.position==='bottom'?area.y+area.height-height:config.position==='left'||config.position==='right'?area.y+Math.round((area.height-height)/2):area.y;
- win.setBounds({x,y,width,height});}
+function place(){if(!win)return;win.setBounds(notchBounds(screen.getPrimaryDisplay().workArea,config.position,accounts.length,expanded,settings));}
 let saving=Promise.resolve();
 function save(){if(demo)return Promise.resolve();const payload=JSON.stringify(config);saving=saving.catch(()=>{}).then(()=>fs.writeFile(path.join(app.getPath('userData'),'settings.json'),payload,{mode:0o600}));return saving;}
 async function refresh(){await Promise.all(accounts.map(a=>poller.refresh(a)));}
@@ -20,7 +18,7 @@ app.whenReady().then(async()=>{
  else {accounts=await discover(os.homedir());try{const saved=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'settings.json'),'utf8'));config.enabled=Array.isArray(saved.enabled)?saved.enabled.filter(x=>typeof x==='string'):[];if(['top','bottom','left','right'].includes(saved.position))config.position=saved.position;}catch{}}
  config.enabled.forEach(id=>poller.enabled.add(id));
  session.defaultSession.webRequest.onBeforeRequest((details,callback)=>callback({cancel:!details.url.startsWith('file:')}));
- win=new BrowserWindow({width:260,height:64,frame:false,transparent:true,resizable:false,alwaysOnTop:true,skipTaskbar:true,show:false,webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({width:248,height:44,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,alwaysOnTop:true,skipTaskbar:true,show:false,webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',event=>event.preventDefault());
  win.on('close',event=>{if(!app.quitting){event.preventDefault();win.hide();}});
  tray=new Tray(nativeImage.createFromPath(path.join(__dirname,'tray.png')));tray.setToolTip('AI Notch');
