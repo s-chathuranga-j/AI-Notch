@@ -29,9 +29,14 @@ async function discover(home) {
 }
 async function claude(account,signal) {
   let credentials;
-  try { credentials=JSON.parse(await fs.readFile(path.join(account.dir,'.credentials.json'),'utf8')).claudeAiOauth; } catch { throw new Error('Sign in using Claude Code in this Windows account, then Retry.'); }
+  try {
+    const stored=JSON.parse((await fs.readFile(path.join(account.dir,'.credentials.json'),'utf8')).replace(/^\uFEFF/,''));
+    credentials=stored.claudeAiOauth || stored.oauthAccount || stored;
+  } catch { throw new Error(`Claude credentials not found in ${path.basename(account.dir)}. Run claude /login, then Retry.`); }
   if(!credentials?.accessToken) throw new Error('No Claude Code subscription login found. Run claude /login.');
-  if(credentials.expiresAt && credentials.expiresAt<=Date.now()) throw new Error('Claude login expired. Run /login in Claude Code, then Retry.');
+  // Some Windows Claude Code releases write expiresAt as 0 or omit it after
+  // rotation. Let Anthropic validate the token instead of rejecting it here.
+  if(Number(credentials.expiresAt)>0 && Number(credentials.expiresAt)<=Date.now()) throw new Error('Claude login expired. Run /login in Claude Code, then Retry.');
   const windows=parseClaude(await request('https://api.anthropic.com/api/oauth/usage',credentials.accessToken,signal));
   if(!windows.length) throw new Error('Claude returned no usage windows.');
   return windows;

@@ -33,3 +33,4 @@ body:is([data-position=left],[data-position=right]) header{justify-content:cente
 body:not(.expanded):not(.settings) main{border:0}
 @media(prefers-reduced-motion:reduce){#settings svg,#settings::before{transition:none}}
 article[data-provider=copilot]{--accent:#c4a7ff}
+#preferences>label+label{margin-top:8px}

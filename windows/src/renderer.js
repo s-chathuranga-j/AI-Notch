@@ -14,10 +14,11 @@ function usageSummary(account){
 function render(state){
  if(!state)return;
  if(state.settings!==current?.settings){selected=null;isExpanded=state.expanded;}
+ if(state.visibility==='always')isExpanded=true;
  current=state;document.body.dataset.position=state.position;
  $('settings').setAttribute('aria-expanded',String(state.settings));
  document.body.classList.toggle('settings',state.settings);
- $('preferences').hidden=!state.settings;$('position').value=state.position;
+ $('preferences').hidden=!state.settings;$('position').value=state.position;$('visibility').value=state.visibility||'onHover';
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
  $('accounts').replaceChildren();$('compact').replaceChildren();
  for(const a of state.accounts){
@@ -52,11 +53,12 @@ function updateView(){
 }
 function showDetail(id){clearTimeout(timer);if(current?.settings||selected===id)return;selected=id;isExpanded=true;updateView();window.notch.detail(id);}
 function expand(){clearTimeout(timer);if(isExpanded)return;isExpanded=true;updateView();window.notch.expand(true);}
-function collapse(){if(current?.settings)return;selected=null;isExpanded=false;updateView();window.notch.expand(false);}
+function collapse(){if(current?.settings||current?.visibility==='always')return;selected=null;isExpanded=false;updateView();window.notch.expand(false);}
 $('settings').onmouseenter=()=>{if(!current?.settings&&selected!==null){selected=null;updateView();window.notch.detail(null);}};
 $('settings').onclick=()=>{clearTimeout(timer);window.notch.settings();};
 $('retry').onclick=()=>window.notch.retry();
 $('position').onchange=e=>window.notch.position(e.target.value);
+$('visibility').onchange=e=>window.notch.visibility(e.target.value);
 document.body.onmouseenter=expand;
 document.body.onmouseleave=()=>{clearTimeout(timer);timer=setTimeout(collapse,350);};
 document.body.onfocusin=expand;

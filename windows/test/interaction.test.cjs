@@ -9,10 +9,10 @@ function setup(){
   replaceChildren(){this.children=[];}
   setAttribute(key,value){this.attributes[key]=value;}
  }
- const ids=Object.fromEntries(['settings','preferences','position','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
+ const ids=Object.fromEntries(['settings','preferences','position','visibility','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
  const body=new Element();const calls=[];let callback;let delayed;
  const state={settings:false,expanded:false,position:'left',demo:true,accounts:['claude','codex'].map(id=>({id,kind:id,label:id,enabled:true,status:'Updated',windows:[{label:'Session',percent:25}],updated:Date.now()}))};
- const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){}};
+ const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){}};
  vm.runInNewContext(fs.readFileSync(require.resolve('../src/renderer.js'),'utf8'),{document:{body,getElementById:id=>ids[id],createElement:()=>new Element(),addEventListener(){}},window:{notch},setTimeout:fn=>{delayed=fn;return 1;},clearTimeout:()=>{delayed=null;}});
  return {ids,body,calls,state,push:callback,leave:()=>{body.onmouseleave();delayed?.();}};
 }
@@ -33,4 +33,11 @@ test('settings hover clears details; clicking opens settings and leaving keeps t
  assert.deepEqual(ui.ids.accounts.children.map(row=>row.hidden),[false,false]);
  ui.push({...ui.state,settings:false,expanded:true});assert.ok(!ui.body.classes.has('details'));
  ui.leave();assert.ok(!ui.body.classes.has('expanded'));
+});
+test('Always visibility keeps the overview open when the pointer leaves',()=>{
+ const ui=setup();ui.push({...ui.state,visibility:'always'});
+ assert.ok(ui.body.classes.has('expanded'));assert.equal(ui.ids.visibility.value,'always');
+ ui.leave();assert.ok(ui.body.classes.has('expanded'));
+ assert.ok(!ui.calls.some(([name,value])=>name==='expand'&&value===false));
+ ui.push({...ui.state,visibility:'onHover'});ui.leave();assert.ok(!ui.body.classes.has('expanded'));
 });
