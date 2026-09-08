@@ -128,30 +128,13 @@ actor GLMProvider: UsageProvider {
         return data
     }
 
-    /// How long to wait after a 429 — a minute, doubling per consecutive
-    /// limit, capped so it always recovers on its own. The server's own hint
-    /// is honoured only as a floor-raiser, for the reason Claude's records.
+    /// How long to wait after a 429 — the shared schedule, kept under this
+    /// name so the tests that pinned it still read against the provider.
     static func backoff(forAttempt attempt: Int, retryAfter: TimeInterval?) -> TimeInterval {
-        let floor: TimeInterval = 60
-        let ceiling: TimeInterval = 15 * 60
-        let doubled = floor * pow(2, Double(min(attempt, 4)))
-        return min(ceiling, max(doubled, retryAfter ?? 0))
+        ProviderBackoff.wait(forAttempt: attempt, retryAfter: retryAfter)
     }
 
-    /// `Retry-After` is either a number of seconds or an HTTP date.
     static func retryAfter(from response: URLResponse?) -> TimeInterval? {
-        guard let header = (response as? HTTPURLResponse)?
-            .value(forHTTPHeaderField: "Retry-After")?
-            .trimmingCharacters(in: .whitespaces)
-        else { return nil }
-
-        if let seconds = TimeInterval(header) { return max(0, seconds) }
-
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "GMT")
-        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-        guard let date = formatter.date(from: header) else { return nil }
-        return max(0, date.timeIntervalSinceNow)
+        ProviderBackoff.retryAfter(from: response)
     }
 }

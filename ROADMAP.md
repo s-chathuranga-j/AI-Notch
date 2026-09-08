@@ -20,6 +20,7 @@ The two applications may use different platform frameworks, but they should shar
 The Mac application is the mature reference implementation. It currently provides:
 
 - Claude, Codex, Cursor, GLM/Z.ai, and Antigravity usage where the provider exposes usable local credentials or a local bridge.
+- Experimental GitHub Copilot quotas, read with the GitHub CLI's login (`gh auth token`) or `COPILOT_GITHUB_TOKEN`, matching the Windows v0.2.0 integration.
 - Separate discovered Claude profiles, including personal and work configurations.
 - Circular provider rings with color bands and reset information.
 - Current coding activity indicators for supported local tools.

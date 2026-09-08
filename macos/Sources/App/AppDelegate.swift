@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Before Preferences reads anything, or the first launch flag and
             // every choice would be read from an empty domain.
             // AI Notch uses its own preferences domain.
-            let providerIDs = Set(claudeProfiles.map(\.id) + ["cursor", "codex", "gemini", "glm"])
+            let providerIDs = Set(claudeProfiles.map(\.id) + ["cursor", "codex", "gemini", "glm", "copilot"])
             let preferences = Preferences(providerIDs: providerIDs)
             self.preferences = preferences
 
@@ -64,7 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let store = UsageStore(
                 providers: isDemo ? [] : claudeProfiles.map { ClaudeOAuthProvider(profile: $0) }
                     + [CursorLocalProvider(), CodexLocalProvider(), AntigravityProvider(),
-                       GLMProvider()],
+                       GLMProvider(), CopilotProvider()],
                 disconnected: preferences.disconnectedProviders
             )
 

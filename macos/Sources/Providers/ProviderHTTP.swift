@@ -42,3 +42,34 @@ enum ProviderHTTP {
         return result
     }
 }
+
+/// How long to wait after a 429, for the providers that poll an endpoint known
+/// to throttle: a minute, doubling per consecutive limit, capped so it always
+/// recovers on its own. The server's own hint is honoured only as a
+/// floor-raiser — a `Retry-After` of two seconds is not a reason to poll
+/// harder than the schedule already does.
+enum ProviderBackoff {
+    static func wait(forAttempt attempt: Int, retryAfter: TimeInterval?) -> TimeInterval {
+        let floor: TimeInterval = 60
+        let ceiling: TimeInterval = 15 * 60
+        let doubled = floor * pow(2, Double(min(attempt, 4)))
+        return min(ceiling, max(doubled, retryAfter ?? 0))
+    }
+
+    /// `Retry-After` is either a number of seconds or an HTTP date.
+    static func retryAfter(from response: URLResponse?) -> TimeInterval? {
+        guard let header = (response as? HTTPURLResponse)?
+            .value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespaces)
+        else { return nil }
+
+        if let seconds = TimeInterval(header) { return max(0, seconds) }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: header) else { return nil }
+        return max(0, date.timeIntervalSinceNow)
+    }
+}

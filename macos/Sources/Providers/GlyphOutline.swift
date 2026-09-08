@@ -409,4 +409,90 @@ enum GlyphOutline {
          CGPoint(x: 0.6820, y: 0.2000), CGPoint(x: 0.0200, y: 0.2000)]
     ]
 
+    /// GitHub Copilot's mark, flattened from Primer Octicons' `copilot-24`.
+    ///
+    /// The same source the Windows build ships as an SVG, so the two apps draw
+    /// the same face. Flattened rather than traced, like `cursor` and
+    /// `antigravity`: the icon is cubic curves and arcs, so it is exact at any
+    /// size. Six loops — the body, the face cut-out, two eye sockets and two
+    /// pupils — which is why the even-odd fill matters here: the sockets sit
+    /// inside the body and read as holes, and the pupils sit inside the face
+    /// cut-out and read as ink again.
+    ///
+    /// Octicons are MIT licensed by GitHub Inc.; the notice is in `UPSTREAM.md`.
+    static let copilot: [[CGPoint]] = [
+        [
+         CGPoint(x: 0.9968, y: 0.7082), CGPoint(x: 0.9650, y: 0.7453), CGPoint(x: 0.9082, y: 0.7902),
+         CGPoint(x: 0.8297, y: 0.8362), CGPoint(x: 0.7331, y: 0.8771),
+         CGPoint(x: 0.6220, y: 0.9063), CGPoint(x: 0.5000, y: 0.9175),
+         CGPoint(x: 0.3780, y: 0.9063), CGPoint(x: 0.2669, y: 0.8771),
+         CGPoint(x: 0.1703, y: 0.8362), CGPoint(x: 0.0918, y: 0.7902),
+         CGPoint(x: 0.0350, y: 0.7453), CGPoint(x: 0.0006, y: 0.7012),
+         CGPoint(x: 0.0002, y: 0.5764), CGPoint(x: 0.0120, y: 0.5482),
+         CGPoint(x: 0.0426, y: 0.5046), CGPoint(x: 0.0856, y: 0.4689),
+         CGPoint(x: 0.1108, y: 0.4582), CGPoint(x: 0.1376, y: 0.3950),
+         CGPoint(x: 0.1365, y: 0.3226), CGPoint(x: 0.1457, y: 0.2723),
+         CGPoint(x: 0.1668, y: 0.2285), CGPoint(x: 0.1912, y: 0.2012),
+         CGPoint(x: 0.3108, y: 0.1261), CGPoint(x: 0.3507, y: 0.1084),
+         CGPoint(x: 0.4447, y: 0.0857), CGPoint(x: 0.5536, y: 0.0857),
+         CGPoint(x: 0.6033, y: 0.0946), CGPoint(x: 0.6888, y: 0.1261),
+         CGPoint(x: 0.7995, y: 0.1937), CGPoint(x: 0.8332, y: 0.2285),
+         CGPoint(x: 0.8602, y: 0.2967), CGPoint(x: 0.8624, y: 0.3950),
+         CGPoint(x: 0.8892, y: 0.4582), CGPoint(x: 0.9144, y: 0.4689),
+         CGPoint(x: 0.9574, y: 0.5046), CGPoint(x: 0.9983, y: 0.5703)
+        ],
+        [
+         CGPoint(x: 0.5072, y: 0.4585), CGPoint(x: 0.4928, y: 0.4585), CGPoint(x: 0.4406, y: 0.5134),
+         CGPoint(x: 0.3921, y: 0.5345), CGPoint(x: 0.3635, y: 0.5400),
+         CGPoint(x: 0.2975, y: 0.5406), CGPoint(x: 0.2385, y: 0.5297),
+         CGPoint(x: 0.1924, y: 0.5063), CGPoint(x: 0.1707, y: 0.4851),
+         CGPoint(x: 0.1667, y: 0.4894), CGPoint(x: 0.1667, y: 0.7638),
+         CGPoint(x: 0.2474, y: 0.8018), CGPoint(x: 0.3623, y: 0.8383),
+         CGPoint(x: 0.5000, y: 0.8546), CGPoint(x: 0.6377, y: 0.8383),
+         CGPoint(x: 0.7526, y: 0.8018), CGPoint(x: 0.8333, y: 0.7638),
+         CGPoint(x: 0.8333, y: 0.4894), CGPoint(x: 0.8293, y: 0.4851),
+         CGPoint(x: 0.8076, y: 0.5063), CGPoint(x: 0.7615, y: 0.5297),
+         CGPoint(x: 0.7025, y: 0.5406), CGPoint(x: 0.6365, y: 0.5400),
+         CGPoint(x: 0.6079, y: 0.5345), CGPoint(x: 0.5594, y: 0.5134)
+        ],
+        [
+         CGPoint(x: 0.5339, y: 0.3362), CGPoint(x: 0.5469, y: 0.3957), CGPoint(x: 0.5613, y: 0.4272),
+         CGPoint(x: 0.5806, y: 0.4511), CGPoint(x: 0.6073, y: 0.4683),
+         CGPoint(x: 0.6447, y: 0.4781), CGPoint(x: 0.7226, y: 0.4751),
+         CGPoint(x: 0.7699, y: 0.4564), CGPoint(x: 0.7920, y: 0.4257),
+         CGPoint(x: 0.8021, y: 0.3497), CGPoint(x: 0.7946, y: 0.2910),
+         CGPoint(x: 0.7727, y: 0.2531), CGPoint(x: 0.7299, y: 0.2267),
+         CGPoint(x: 0.6842, y: 0.2145), CGPoint(x: 0.6267, y: 0.2085),
+         CGPoint(x: 0.5694, y: 0.2180), CGPoint(x: 0.5495, y: 0.2324),
+         CGPoint(x: 0.5362, y: 0.2581)
+        ],
+        [
+         CGPoint(x: 0.4661, y: 0.3362), CGPoint(x: 0.4638, y: 0.2581), CGPoint(x: 0.4505, y: 0.2324),
+         CGPoint(x: 0.4306, y: 0.2180), CGPoint(x: 0.3733, y: 0.2085),
+         CGPoint(x: 0.3158, y: 0.2145), CGPoint(x: 0.2701, y: 0.2267),
+         CGPoint(x: 0.2273, y: 0.2531), CGPoint(x: 0.2054, y: 0.2910),
+         CGPoint(x: 0.1979, y: 0.3497), CGPoint(x: 0.2080, y: 0.4257),
+         CGPoint(x: 0.2301, y: 0.4564), CGPoint(x: 0.2774, y: 0.4751),
+         CGPoint(x: 0.3553, y: 0.4781), CGPoint(x: 0.3927, y: 0.4683),
+         CGPoint(x: 0.4194, y: 0.4511), CGPoint(x: 0.4387, y: 0.4272),
+         CGPoint(x: 0.4531, y: 0.3957)
+        ],
+        [
+         CGPoint(x: 0.6042, y: 0.5940), CGPoint(x: 0.6336, y: 0.6062), CGPoint(x: 0.6458, y: 0.6356),
+         CGPoint(x: 0.6458, y: 0.7190), CGPoint(x: 0.6403, y: 0.7398),
+         CGPoint(x: 0.6250, y: 0.7550), CGPoint(x: 0.6042, y: 0.7606),
+         CGPoint(x: 0.5833, y: 0.7550), CGPoint(x: 0.5681, y: 0.7398),
+         CGPoint(x: 0.5625, y: 0.7190), CGPoint(x: 0.5639, y: 0.6248),
+         CGPoint(x: 0.5747, y: 0.6062)
+        ],
+        [
+         CGPoint(x: 0.3958, y: 0.5940), CGPoint(x: 0.4253, y: 0.6062), CGPoint(x: 0.4375, y: 0.6356),
+         CGPoint(x: 0.4375, y: 0.7190), CGPoint(x: 0.4319, y: 0.7398),
+         CGPoint(x: 0.4167, y: 0.7550), CGPoint(x: 0.3958, y: 0.7606),
+         CGPoint(x: 0.3750, y: 0.7550), CGPoint(x: 0.3597, y: 0.7398),
+         CGPoint(x: 0.3542, y: 0.7190), CGPoint(x: 0.3556, y: 0.6248),
+         CGPoint(x: 0.3664, y: 0.6062)
+        ],
+    ]
+
 }

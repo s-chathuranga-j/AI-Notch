@@ -51,8 +51,23 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Text("Personal: claude\nWork: CLAUDE_CONFIG_DIR=~/.claude-work claude")
                     .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
-                Text("Cursor, Codex, Antigravity and GLM currently show one account each.")
+                Text("Cursor, Codex, Antigravity, GLM and Copilot currently show one account each.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+
+            // Its own section, because Copilot is the one provider whose
+            // credential comes from a command-line login rather than an app
+            // that is already on screen — and because the endpoint behind it
+            // is internal to GitHub, which is worth saying before it fails.
+            Section("GitHub Copilot (experimental)") {
+                Text("Sign in to the GitHub CLI with the account that holds your Copilot subscription, then enable Copilot above. AI Notch asks the CLI for its token and sends it only to GitHub’s Copilot quota endpoint. VS Code and browser sign-ins are not read.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("gh auth login")
+                    .font(.system(.caption, design: .monospaced)).textSelection(.enabled)
+                Text("If GitHub refuses the CLI’s token, launch AI Notch with a compatible token in COPILOT_GITHUB_TOKEN instead. Quotas come from an internal GitHub endpoint that can change or deny access; missing data is reported as missing, never estimated.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // One section, because they are one question: what AI Notch
@@ -140,8 +155,9 @@ struct SettingsView: View {
     static let setupCopy =
         "AI Notch reads usage from tools already signed in on this Mac — it "
         + "never asks for your password. Install and sign in to any of Claude "
-        + "Code (the terminal tool, not the Claude app), Cursor, Codex or "
-        + "Antigravity, then enable the accounts you want here."
+        + "Code (the terminal tool, not the Claude app), Cursor, Codex, "
+        + "Antigravity or the GitHub CLI (for Copilot), then enable the accounts "
+        + "you want here."
 
     /// Said before it happens rather than after. A system dialogue asking to
     /// read a *credential*, from an app installed a minute ago, looks alarming

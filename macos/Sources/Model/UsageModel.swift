@@ -42,19 +42,40 @@ struct LimitWindow: Identifiable, Codable, Equatable {
     let used: Int?
     /// Nil when the provider does not say when the window rolls over.
     let resetsAt: Date?
+    /// True when the provider says this allowance is not metered at all —
+    /// Copilot's chat and completions on a paid plan. Not the same as having
+    /// no reading: here the absence of a number *is* the reading, and the row
+    /// says so rather than showing a blank.
+    let isUnlimited: Bool
 
     init(id: String, label: String, usedFraction: Double? = nil,
-         remaining: Int? = nil, used: Int? = nil, resetsAt: Date? = nil) {
+         remaining: Int? = nil, used: Int? = nil, resetsAt: Date? = nil,
+         isUnlimited: Bool = false) {
         self.id = id
         self.label = label
         self.usedFraction = usedFraction
         self.remaining = remaining
         self.used = used
         self.resetsAt = resetsAt
+        self.isUnlimited = isUnlimited
+    }
+
+    /// Archived readings predate `isUnlimited`, so a missing key has to read
+    /// as false rather than fail the whole archive.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        label = try container.decode(String.self, forKey: .label)
+        usedFraction = try container.decodeIfPresent(Double.self, forKey: .usedFraction)
+        remaining = try container.decodeIfPresent(Int.self, forKey: .remaining)
+        used = try container.decodeIfPresent(Int.self, forKey: .used)
+        resetsAt = try container.decodeIfPresent(Date.self, forKey: .resetsAt)
+        isUnlimited = try container.decodeIfPresent(Bool.self, forKey: .isUnlimited) ?? false
     }
 
     /// What the tooltip says on the line under the bar.
     var summary: String {
+        if isUnlimited { return "Unlimited" }
         if let usedFraction {
             // Both ends of the same figure. Vendors do not agree on which to
             // show — Codex writes "87% remaining", Claude writes "% used" — so
@@ -137,6 +158,7 @@ struct ProviderSnapshot: Identifiable, Equatable {
     /// What the cell prints under the ring.
     var headlineText: String {
         if let usedFraction { return "\(Int((usedFraction * 100).rounded()))%" }
+        if headline?.isUnlimited == true { return "∞" }
         if let remaining = headline?.remaining { return "\(remaining)" }
         if let used = headline?.used { return "\(used)" }
         return "—"
@@ -163,6 +185,7 @@ struct ProviderSnapshot: Identifiable, Equatable {
         case "codex":      return "Sign in to Codex to read your usage"
         case "gemini":     return "Sign in to Antigravity to read your usage"
         case "glm":        return "Set up a GLM Coding Plan key for a coding tool to read your usage"
+        case "copilot":    return "Sign in to the GitHub CLI (gh auth login) with your Copilot account to read your quota"
         default:           return "Sign in to \(displayName) to read your usage"
         }
     }
