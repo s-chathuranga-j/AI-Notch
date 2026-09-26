@@ -36,6 +36,8 @@ Accounts start disabled on the first launch of version 0.2.0, including upgrades
 
 Enabling an account allows local credential/account reads, usage requests and session monitoring where that provider needs them. Live usage sends authentication to the relevant provider over HTTPS. Codex launches its installed app server; Antigravity asks its local language server for quota without reading the rotating Antigravity Keychain item; Copilot runs `gh auth token --hostname github.com` to borrow the GitHub CLI’s login. These tools manage their own backend connections.
 
+Claude Code's macOS login is a Keychain item. Routine AI Notch refreshes read it without allowing a system password dialog. If a new or rotated item needs approval, the last reading remains visible and the Claude row in Settings offers **Allow access…** for one interactive attempt. Choosing Always Allow applies to that item and app identity; a later newly created item or a local rebuild may need separate approval. Copilot uses the GitHub CLI's credential path, not AI Notch's Keychain reader.
+
 Disabling an account cancels its active usage task, prevents queued requests, discards late results, clears its archived readings and credential cache, and stops/clears session monitoring. A request that has already reached the provider cannot be recalled. Other enabled accounts keep operating.
 
 Direct provider HTTP requests use exact destination checks, reject redirects, and have no persistent response, cookie or credential store. No raw usage responses, tokens or subprocess output are written to app logs. There is no AI Notch telemetry service or embedded browser. Previous OS diagnostic logs are not retroactively erased; the app clears its old HTTP response cache at launch.

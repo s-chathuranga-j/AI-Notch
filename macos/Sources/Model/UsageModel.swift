@@ -198,8 +198,8 @@ struct ProviderSnapshot: Identifiable, Equatable {
         case .accessDenied:
             // Says what happened and what fixes it. "Sign in to Claude Code"
             // would send someone who *is* signed in to fix the wrong thing.
-            return "AI Notch was refused access to \(displayName)'s saved "
-                 + "login. Click this ring to ask again, and choose Always Allow."
+            return "AI Notch needs permission to read \(displayName)'s current "
+                 + "login. Open Settings and choose Allow access."
         case .unsupported(let why): return why
         case .error(let why): return "Couldn't read usage — \(why)"
         case .stale, .ok:     return "Waiting for the first reading…"

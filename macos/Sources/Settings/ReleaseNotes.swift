@@ -30,6 +30,10 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.2", headline: "Claude checks without surprise password prompts.", changes: [
+            .init(title: "Quiet Claude refreshes", detail: "AI Notch reads a permitted Claude Code login without opening a Keychain dialog. If Claude Code creates a new item that needs permission, the last usage reading stays visible and Settings offers Allow access."),
+            .init(title: "Permission only when requested", detail: "The Allow access button permits one interactive read. Newly rotated Keychain items may need their own approval, but routine polling will not interrupt you.")
+        ]),
         ReleaseNote(version: "0.3.1", headline: "Antigravity without repeat Keychain prompts.", changes: [
             .init(title: "The same live quota, from Antigravity", detail: "AI Notch now asks Antigravity's running local service for its usage figure. It no longer reads the rotating gemini Keychain item on every refresh or when Settings opens."),
             .init(title: "When Antigravity is closed", detail: "The last quota remains stale; before the first reading, a local request count is shown without a percentage.")

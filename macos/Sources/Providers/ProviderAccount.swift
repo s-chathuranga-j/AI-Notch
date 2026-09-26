@@ -104,6 +104,8 @@ extension UsageProvider {
 
     /// Providers that hold nothing in memory have nothing to drop.
     func forgetCachedCredential() {}
+
+    func authorizeCredentialAccess() { forgetCachedCredential() }
 }
 
 /// A provider as the settings sheet needs it.

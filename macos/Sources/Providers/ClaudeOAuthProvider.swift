@@ -186,6 +186,8 @@ actor ClaudeOAuthProvider: UsageProvider {
 
     nonisolated func forgetCachedCredential() { keychain.forgetCached() }
 
+    nonisolated func authorizeCredentialAccess() { keychain.authorizeNextRead() }
+
     nonisolated func account() -> ProviderAccount? {
         guard let credentials = try? loadCredentials() else { return nil }
         return ProviderAccount(

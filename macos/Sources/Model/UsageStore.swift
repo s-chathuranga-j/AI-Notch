@@ -295,7 +295,7 @@ final class UsageStore: ObservableObject {
     /// whenever the token is still valid, so the keychain is never touched and
     /// the prompt never returns — the button would appear to do nothing.
     func reauthorize(providerID: String) {
-        providers.first { $0.id == providerID }?.forgetCachedCredential()
+        providers.first { $0.id == providerID }?.authorizeCredentialAccess()
         refresh(providerID: providerID)
     }
 

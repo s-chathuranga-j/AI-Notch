@@ -1,5 +1,20 @@
 import XCTest
+import Security
+import LocalAuthentication
 @testable import AINotch
+
+final class ClaudeKeychainPromptTests: XCTestCase {
+    func testRoutineReadForbidsSystemAuthenticationUI() {
+        let query = ClaudeCredentials.query(for: Data([1, 2, 3]), allowInteraction: false)
+        let context = query[kSecUseAuthenticationContext] as? LAContext
+        XCTAssertEqual(context?.interactionNotAllowed, true)
+    }
+
+    func testExplicitApprovalCanShowSystemAuthenticationUI() {
+        let query = ClaudeCredentials.query(for: Data([1, 2, 3]), allowInteraction: true)
+        XCTAssertNil(query[kSecUseAuthenticationContext])
+    }
+}
 
 /// The token path of `ClaudeOAuthProvider`.
 ///

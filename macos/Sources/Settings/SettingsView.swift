@@ -159,15 +159,10 @@ struct SettingsView: View {
         + "Antigravity or the GitHub CLI (for Copilot), then enable the accounts "
         + "you want here."
 
-    /// Said before it happens rather than after. A system dialogue asking to
-    /// read a *credential*, from an app installed a minute ago, looks alarming
-    /// unless it was expected — and choosing Allow instead of Always Allow makes
-    /// it return on every read, which is what "it asks every time" turns out to
-    /// be.
     static let keychainCopy =
-        "macOS will ask for permission to read a saved login when needed. "
-        + "Allow grants access for this request; Always Allow remembers the decision "
-        + "for this app's signing identity. Local rebuilds may prompt again."
+        "Claude Code stores its login in Keychain. AI Notch checks it without "
+        + "opening a password dialog. If a new item needs approval, use Allow "
+        + "access in the Claude row. Local rebuilds may need approval again."
 
     private var setupNote: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -244,8 +239,8 @@ private struct AccountRow: View {
                 if isConnected, provider.wasRefusedAccess {
                     Button("Allow access…") { retry(provider.id) }
                         .controlSize(.small)
-                        .help("Asks macOS for \(provider.name)'s saved login again. "
-                              + "Choose Always Allow and it will stop asking.")
+                        .help("Asks macOS for \(provider.name)'s current saved login. "
+                              + "A newly rotated Claude Code item may need separate approval.")
                 }
 
                 if isConnected, let destination {
