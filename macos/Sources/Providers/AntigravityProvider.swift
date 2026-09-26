@@ -1,19 +1,10 @@
 import Foundation
 import os
 
-/// Gemini, as Antigravity sees it.
-///
-/// **What this can and cannot report, and why.** Antigravity talks to Google's
-/// Cloud Code backend, and the only call that describes the account is
-/// `:loadCodeAssist`. It answers with tiers — which plan you are on and which
-/// you are not eligible for — and no numbers: no used, no limit, no reset. A
-/// packet capture of a signed-in install showed exactly two RPCs, and neither
-/// carries a quota.
-///
-/// So this provider reports the account honestly and says there is nothing
-/// metered, rather than inventing a ring. That is the same answer Cursor's free
-/// plan gets, and for the same reason: a confident 0% is worse than an admitted
-/// blank, especially in something people pay for.
+/// Antigravity's local language server already holds the Google credential and
+/// serves the quota used by its own Models & Usage panel. Asking that service
+/// avoids reading its rotating Keychain item, which can prompt again after each
+/// rotation even if the user previously chose Always Allow.
 actor AntigravityProvider: UsageProvider {
     nonisolated let id = "gemini"
     // The id stays `gemini`: it keys the archive and the user's connection
@@ -21,15 +12,10 @@ actor AntigravityProvider: UsageProvider {
     nonisolated let displayName = "Antigravity"
     nonisolated let glyph = ProviderGlyph.antigravity
 
-    /// The production host. Antigravity itself also calls a `daily-` variant,
-    /// which answers 403 to this token — so it is not a fallback, it is a
-    /// different audience.
-    private let endpoint = URL(string: "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist")!
-    /// The real usage figure — when the account is allowed to ask for it.
-    private let quotaEndpoint = URL(string: "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary")!
-    private let session: URLSession
-    /// A second session, trusting loopback only, for the local language server.
     private let localSession: URLSession
+    /// A test can supply a local quota without launching Antigravity or asking
+    /// the keychain. Production uses the running language server only.
+    private let readLocalQuota: (@Sendable () async -> [LimitWindow]?)?
     /// Re-discovering the port and token means spawning `ps` and `lsof`, which
     /// is not something to do every minute. Cached until it stops working.
     /// Whether the language server has ever answered.
@@ -41,67 +27,29 @@ actor AntigravityProvider: UsageProvider {
     /// rather than degraded.
     private var everBridged = false
 
-    init(session: URLSession = ProviderHTTP.session()) {
-        self.session = session
+    init(readLocalQuota: (@Sendable () async -> [LimitWindow]?)? = nil) {
         self.localSession = ProviderHTTP.session(delegate: LocalhostTrust())
+        self.readLocalQuota = readLocalQuota
     }
 
     nonisolated var signInRoute: SignInRoute {
         .openApp(bundleID: "com.google.antigravity", name: "Antigravity")
     }
 
-    nonisolated func forgetCachedCredential() { AntigravityCredentials.forgetCached() }
+    nonisolated func forgetCachedCredential() {}
 
     nonisolated func account() -> ProviderAccount? {
-        guard let credentials = try? AntigravityCredentials.load() else { return nil }
         return ProviderAccount(
-            label: nil,   // the token carries no address
-            plan: credentials.authMethod == "consumer" ? "Personal" : credentials.authMethod,
+            label: nil,
+            plan: nil,
             source: "Antigravity",
             manageURL: URL(string: "https://antigravity.google")
         )
     }
 
     func fetchSnapshot() async throws -> ProviderSnapshot {
-        let credentials = try AntigravityCredentials.load()
-        // Expired is not signed out: Antigravity refreshes this on its own the
-        // next time it runs, and the last reading is still true, just old.
-        if credentials.isExpired { throw UsageProviderError.credentialExpired }
-
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(credentials.accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // `GEMINI` and not `ANTIGRAVITY`: the latter is rejected outright with
-        // "Invalid value at 'metadata.plugin_type'". The wire name lags the
-        // product name.
-        request.httpBody = try JSONSerialization.data(
-            withJSONObject: ["metadata": ["pluginType": "GEMINI"]]
-        )
-        request.timeoutInterval = 15
-
-        let (data, response) = try await ProviderHTTP.data(for: request, using: session, hosts: ["cloudcode-pa.googleapis.com"])
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-
-        if status == 401 {
-            // Same reasoning as Claude's: rejected but unexpired means the
-            // account underneath has changed.
-            AntigravityCredentials.forgetCached()
-            throw UsageProviderError.needsAuth
-        }
-        if status == 403 { throw UsageProviderError.needsAuth }
-        if status == 429 {
-            let retry = (response as? HTTPURLResponse)?
-                .value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
-            throw UsageProviderError.rateLimited(retryAfter: retry ?? 0)
-        }
-        guard status == 200 else { throw UsageProviderError.badResponse(status: status) }
-
-        let tier = Self.tier(in: data)
-
-        // Antigravity's own language server first: it holds the client identity
-        // Google insists on, and answers with the same figure the app's own
-        // usage panel shows.
+        // This is the only live quota path. Antigravity manages the token and
+        // the remote refresh; AI Notch never asks macOS for its Keychain data.
         if let windows = await localQuota(), !windows.isEmpty {
             everBridged = true
             return ProviderSnapshot(id: id, displayName: displayName, glyph: glyph,
@@ -114,14 +62,8 @@ actor AntigravityProvider: UsageProvider {
         // `credentialExpired` is the store's word for "still true, just old".
         if everBridged { throw UsageProviderError.credentialExpired }
 
-        // Then Google directly, which answers for a licensed account.
-        if let windows = try await quota(token: credentials.accessToken), !windows.isEmpty {
-            return ProviderSnapshot(id: id, displayName: displayName, glyph: glyph,
-                                    fidelity: .official, status: .ok, windows: windows)
-        }
-
-        // Not licensed, so Google will not say how much of what. Our own count
-        // is the only number left — reported as a *count*, with no
+        // Without the local quota service, our own count is the only number
+        // available — reported as a *count*, with no
         // `usedFraction`, which is a case the model already knows: the cell
         // prints the number and the ring draws its track with no arc, because
         // there is no limit to be a fraction of.
@@ -152,29 +94,9 @@ actor AntigravityProvider: UsageProvider {
     /// answer to fall back to.
     private func localQuota() async -> [LimitWindow]? {
         try? Task.checkCancellation()
+        if let readLocalQuota { return await readLocalQuota() }
         guard !Task.isCancelled, let fresh = AntigravityBridge.discover() else { return nil }
         return try? await AntigravityBridge.quota(from: fresh, session: localSession)
-    }
-
-    /// Ask for the account's quota, returning nil when it is not allowed to.
-    ///
-    /// A free or personal account answers 403 #3501, "You do not have a valid
-    /// license of this product" — the endpoint exists and the request is well
-    /// formed, the entitlement is what is missing. That is not an error worth
-    /// alarming anyone about, so it returns nil and the caller falls back.
-    private func quota(token: String) async throws -> [LimitWindow]? {
-        var request = URLRequest(url: quotaEndpoint)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Empty on purpose. The request message carries no fields — sending
-        // `metadata` or `quotaId` is rejected outright with "Unknown name".
-        request.httpBody = Data("{}".utf8)
-        request.timeoutInterval = 15
-
-        let (data, response) = try await ProviderHTTP.data(for: request, using: session, hosts: ["cloudcode-pa.googleapis.com"])
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return Self.windows(in: data)
     }
 
     /// Turns a quota summary into limit windows.

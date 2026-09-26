@@ -30,6 +30,10 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.1", headline: "Antigravity without repeat Keychain prompts.", changes: [
+            .init(title: "The same live quota, from Antigravity", detail: "AI Notch now asks Antigravity's running local service for its usage figure. It no longer reads the rotating gemini Keychain item on every refresh or when Settings opens."),
+            .init(title: "When Antigravity is closed", detail: "The last quota remains stale; before the first reading, a local request count is shown without a percentage.")
+        ]),
         ReleaseNote(version: "0.3.0", headline: "GitHub Copilot joins the notch.", changes: [
             .init(title: "Copilot quotas, experimentally", detail: "A Copilot ring beside the others, read through the GitHub CLI’s login or COPILOT_GITHUB_TOKEN. Premium requests or AI credits fill the ring; chat and completions show as Unlimited."),
             .init(title: "Only GitHub’s own endpoint", detail: "The token goes to api.github.com and nowhere else, with redirects refused. GitHub can change or refuse this internal endpoint; when it does, the ring says so instead of guessing."),

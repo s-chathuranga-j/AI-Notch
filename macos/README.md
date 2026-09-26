@@ -34,7 +34,7 @@ Quit an already running AI Notch before switching between demo and live mode. Op
 
 Accounts start disabled on the first launch of version 0.2.0, including upgrades from the earlier preview. Enable only the accounts you want in Settings. Future choices are saved; newly discovered profiles remain off until enabled.
 
-Enabling an account allows local credential/account reads, usage requests and session monitoring for that account. Live usage sends authentication to the relevant provider over HTTPS. Codex launches its installed app server; Antigravity can ask its local language server to refresh remotely; Copilot runs `gh auth token --hostname github.com` to borrow the GitHub CLI’s login. These tools manage their own backend connections.
+Enabling an account allows local credential/account reads, usage requests and session monitoring where that provider needs them. Live usage sends authentication to the relevant provider over HTTPS. Codex launches its installed app server; Antigravity asks its local language server for quota without reading the rotating Antigravity Keychain item; Copilot runs `gh auth token --hostname github.com` to borrow the GitHub CLI’s login. These tools manage their own backend connections.
 
 Disabling an account cancels its active usage task, prevents queued requests, discards late results, clears its archived readings and credential cache, and stops/clears session monitoring. A request that has already reached the provider cannot be recalled. Other enabled accounts keep operating.
 

@@ -271,6 +271,23 @@ final class AntigravityCountSnapshotTests: XCTestCase {
     }
 }
 
+final class AntigravityPromptRegressionTests: XCTestCase {
+    func testLocalQuotaWorksWithoutReadingTheGeminiKeychainItem() async throws {
+        let provider = AntigravityProvider(readLocalQuota: {
+            [LimitWindow(id: "gemini-weekly", label: "Gemini Models",
+                         usedFraction: 0.25)]
+        })
+
+        // This test host has no entitlement to Antigravity's secret. A
+        // Keychain-first fetch would either prompt or fail before reaching the
+        // injected local service. Settings must not read that secret either.
+        XCTAssertEqual(provider.account()?.source, "Antigravity")
+        let snapshot = try await provider.fetchSnapshot()
+        XCTAssertEqual(snapshot.windows.first?.usedFraction, 0.25)
+        XCTAssertEqual(snapshot.headlineID, "gemini-weekly")
+    }
+}
+
 /// The bridge to Antigravity's own language server — the only route that
 /// actually returns the weekly figure, because it is the route Antigravity
 /// itself uses.
@@ -853,8 +870,8 @@ final class ReauthorizeTests: XCTestCase {
     }
 }
 
-/// Only two providers keep a credential in the keychain; the others read files
-/// and can never raise a prompt.
+/// Only Claude profiles offer a keychain permission action. Antigravity reads
+/// its local service and no longer needs access to its rotating secret.
 final class KeychainProviderTests: XCTestCase {
     private func summary(_ id: String) -> ProviderSummary {
         ProviderSummary(id: id, name: id, glyph: .claude, account: nil,
@@ -864,7 +881,7 @@ final class KeychainProviderTests: XCTestCase {
     func testOnlyKeychainBackedProvidersOfferIt() {
         XCTAssertTrue(summary("claude").usesKeychain)
         XCTAssertTrue(summary("claude-work").usesKeychain, "every profile's token is a keychain item")
-        XCTAssertTrue(summary("gemini").usesKeychain)
+        XCTAssertFalse(summary("gemini").usesKeychain)
         XCTAssertFalse(summary("cursor").usesKeychain, "Cursor reads a file, not the keychain")
         XCTAssertFalse(summary("codex").usesKeychain, "Codex reads a file, not the keychain")
     }
