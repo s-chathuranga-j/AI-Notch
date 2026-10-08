@@ -1,4 +1,12 @@
-# AI Notch for Windows v0.3.0 — Preview
+# AI Notch for Windows v0.3.1 — Preview
+
+The Windows app now uses the AI Notch artwork from macOS for its executable, window, and system tray icon. The executable embeds icon sizes from 16 to 256 pixels for different display scales, along with the app name and version metadata.
+
+Download the x64 ZIP for Intel/AMD PCs or the ARM64 ZIP for Windows on Arm. Quit AI Notch from the tray, extract the complete ZIP into your app folder, and run **AI Notch.exe**. Existing preferences are retained. This remains an unsigned portable preview.
+
+All 29 Windows tests pass. Both ZIPs were built on macOS and checked for ZIP integrity, correct executable architecture and version, all nine embedded icon sizes, and matching bundled source and artwork. The runtime icon paths were checked for Windows and the macOS preview. Native Windows desktop rendering remains unverified for this icon update.
+
+## Earlier release: Windows v0.3.0
 
 Claude usage now reads correctly on plans that do not use session and weekly windows, and a reading that cannot be refreshed stays on screen instead of disappearing.
 

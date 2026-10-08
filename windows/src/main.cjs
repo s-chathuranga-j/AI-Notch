@@ -1,8 +1,9 @@
-const {app,BrowserWindow,Tray,Menu,nativeImage,ipcMain,screen,session}=require('electron');
+const {app,BrowserWindow,Tray,Menu,ipcMain,screen,session}=require('electron');
 const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');
 const {discover,Poller,fetchUsage}=require('./providers.cjs');
 const {notchBounds}=require('./layout.cjs');
 const demo=process.platform!=='win32'||process.argv.includes('--demo');
+const icon=path.join(__dirname,process.platform==='win32'?'assets/app.ico':'tray.png');
 const VISIBILITIES=['onHover','always','hidden'];
 let win,tray,accounts=[],config={enabled:[],position:'top',visibility:'onHover'},rows={},settings=false,expanded=false,detailId=null;
 const poller=new Poller(demo?async account=>account.kind==='copilot'?[{label:'AI credits',percent:28,reset:new Date(Date.now()+604800000).toISOString()},{label:'Completions',percent:null,unlimited:true,reset:null}]:[{label:'Session',percent:account.kind==='claude'?37:62,reset:new Date(Date.now()+7200000).toISOString()},{label:'Weekly',percent:21,reset:null}]:fetchUsage,(id,row)=>{rows[id]=row;push();});
@@ -28,10 +29,10 @@ app.whenReady().then(async()=>{
  else {accounts=await discover(os.homedir());try{const saved=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'settings.json'),'utf8'));config.enabled=Array.isArray(saved.enabled)?saved.enabled.filter(x=>typeof x==='string'):[];if(['top','bottom','left','right'].includes(saved.position))config.position=saved.position;if(VISIBILITIES.includes(saved.visibility))config.visibility=saved.visibility;}catch{}}
  config.enabled.forEach(id=>poller.enabled.add(id));
  session.defaultSession.webRequest.onBeforeRequest((details,callback)=>callback({cancel:!details.url.startsWith('file:')}));
- win=new BrowserWindow({width:80,height:6,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,alwaysOnTop:true,skipTaskbar:true,show:false,webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
+ win=new BrowserWindow({icon,width:80,height:6,frame:false,transparent:true,backgroundColor:'#00000000',hasShadow:false,resizable:false,alwaysOnTop:true,skipTaskbar:true,show:false,webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,sandbox:true,nodeIntegration:false}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));win.webContents.on('will-navigate',event=>event.preventDefault());
  win.on('close',event=>{if(!app.quitting){event.preventDefault();win.hide();}});
- tray=new Tray(nativeImage.createFromPath(path.join(__dirname,'tray.png')));tray.setToolTip('AI Notch');
+ tray=new Tray(icon);tray.setToolTip('AI Notch');
  const openSettings=()=>{settings=true;expanded=true;win.setIgnoreMouseEvents(false);place();win.show();push();};
  const showNotch=()=>{expanded=true;win.setIgnoreMouseEvents(false);place();win.show();push();};
  tray.setContextMenu(Menu.buildFromTemplate([{label:'Show AI Notch',click:showNotch},{label:'Settings',click:openSettings},{label:'Refresh usage',click:refresh},{type:'separator'},{label:'Quit',click:()=>{app.quitting=true;app.quit();}}]));tray.on('click',openSettings);

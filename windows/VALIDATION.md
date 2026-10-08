@@ -1,4 +1,13 @@
-# Windows v0.2.0 validation - 2026-09-08
+# Windows v0.3.1 validation - 2026-10-08
+
+- All 29 Windows tests pass; the main process passes Node syntax checking and `git diff --check` passes.
+- x64 and ARM64 ZIPs built successfully on macOS. ZIP integrity and executable architecture were verified for both.
+- Both executables contain the AI Notch artwork at 16, 20, 24, 32, 40, 48, 64, 128, and 256 pixels; every embedded image matches the source ICO. Product name and version metadata are correct.
+- Every bundled source file and icon matches the working source. ZIP executables and app archives match the verified unpacked artifacts; app archives identify version 0.3.1.
+- Windows and macOS preview icon paths resolve to existing ICO and PNG assets respectively. SHA-256 checksums were generated for both ZIPs.
+- Native Windows desktop icon rendering and live provider authentication were not tested for this update. Portable builds remain unsigned.
+
+## Windows v0.2.0 validation - 2026-09-08
 
 - All 18 Windows tests pass, covering provider parsing, opt-in/cancellation, credential destinations, hover interactions, and all four screen edges.
 - Changed JavaScript entry points pass Node syntax checks; `git diff --check` passes.
