@@ -1,4 +1,12 @@
-# AI Notch for Windows v0.3.1 — Preview
+# AI Notch for Windows v0.3.2 — Preview
+
+Original AI Notch artwork replaces the inherited Code Notch icon. The executable, window, and system tray now use AI Notch's own icon, shared with the macOS app. The Windows executable includes nine sizes from 16 to 256 pixels for different display scales.
+
+Quit AI Notch through the tray menu, extract the complete x64 or ARM64 ZIP into your app folder, and run **AI Notch.exe**. Existing preferences are retained. This remains an unsigned portable preview.
+
+All 29 Windows tests pass. Both ZIPs passed integrity checks, and their executable architecture, version, nine embedded icon images, and bundled source files match the verified build. Native Windows desktop rendering was not tested for this artwork update.
+
+## Earlier release: Windows v0.3.1
 
 The Windows app now uses the AI Notch artwork from macOS for its executable, window, and system tray icon. The executable embeds icon sizes from 16 to 256 pixels for different display scales, along with the app name and version metadata.
 

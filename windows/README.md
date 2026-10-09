@@ -1,6 +1,6 @@
 # AI Notch for Windows
 
-A tray application with a thin black notch at any screen edge. Hover to reveal logos and percentages, then hover a logo for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.1 release notes](RELEASE-NOTES.md).
+A tray application with a thin black notch at any screen edge. Hover to reveal logos and percentages, then hover a logo for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.2 release notes](RELEASE-NOTES.md).
 
 ## Run on Windows
 

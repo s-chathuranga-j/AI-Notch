@@ -30,6 +30,9 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.3", headline: "An icon of our own.", changes: [
+            .init(title: "A new AI Notch icon", detail: "Original artwork gives AI Notch its own visual identity across macOS and Windows.")
+        ]),
         ReleaseNote(version: "0.3.2", headline: "Claude checks without surprise password prompts.", changes: [
             .init(title: "Quiet Claude refreshes", detail: "AI Notch reads a permitted Claude Code login without opening a Keychain dialog. If Claude Code creates a new item that needs permission, the last usage reading stays visible and Settings offers Allow access."),
             .init(title: "Permission only when requested", detail: "The Allow access button permits one interactive read. Newly rotated Keychain items may need their own approval, but routine polling will not interrupt you.")
