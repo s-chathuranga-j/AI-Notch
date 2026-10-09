@@ -1,4 +1,12 @@
-# AI Notch for Windows v0.3.3 — Preview
+# AI Notch for Windows v0.3.4 — Preview
+
+Windows now has a Setup EXE. Run it to install AI Notch for your Windows user, create Start menu and desktop shortcuts, and launch the app. The same installer selects the native x64 or ARM64 app. Uninstall from Windows Settings; saved preferences are preserved during upgrades and uninstall.
+
+Quit any existing copy from its tray menu before installing. Previous portable installations share the same saved preferences, and their extracted folders are left untouched. Portable ZIPs remain available. The installer and app remain unsigned previews.
+
+All 29 Windows tests pass. The installer and ZIPs passed integrity checks; both embedded native payloads match the verified app builds. Product/version, icons, app identity, and non-elevating manifests were checked for the installer and uninstaller. Native Windows install, upgrade, and uninstall execution remain untested.
+
+## Earlier release: Windows v0.3.3
 
 A small brain replaces the star in AI Notch's icon. The N monogram, screen-notch cutout, and dark tile remain, shared with the macOS app. The executable, window, and tray use the updated artwork at all nine Windows icon sizes.
 

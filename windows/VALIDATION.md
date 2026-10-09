@@ -1,4 +1,12 @@
-# Windows v0.3.3 validation - 2026-10-09
+# Windows v0.3.4 validation - 2026-10-09
+
+- All 29 Windows tests pass. The universal NSIS Setup EXE and x64/ARM64 portable ZIPs built on macOS arm64 using the pinned NSIS 1.2.1 toolset (compiler 3.12).
+- Installer and ZIP integrity checks pass. Both embedded native payloads contain the exact executable and app archive from the verified unpacked builds; portable ZIP payloads match too.
+- Executable architectures, version 0.3.4, all nine brain icon images, and every bundled source file were verified. Setup and its embedded uninstaller have the correct product/version and icons, and both request `asInvoker` execution.
+- App identity is unchanged from the portable release. One-click, per-user installation and preservation of app data on uninstall were checked in the build configuration. SHA-256 checksums cover the installer and both ZIPs.
+- Native Windows installation, shortcuts, upgrades, app-data preservation during uninstall, and live provider authentication were not executed on this Mac. The installer and app remain unsigned.
+
+## Windows v0.3.3 validation - 2026-10-09
 
 - All 29 Windows tests pass. Both x64 and ARM64 ZIPs built on macOS and passed ZIP integrity checks.
 - Correct executable architecture, AI Notch product name, version 0.3.3, and all nine brain icon images were verified; embedded images match the source ICO byte for byte.

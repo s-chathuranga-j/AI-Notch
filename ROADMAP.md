@@ -50,6 +50,10 @@ The first published Windows preview contains:
 
 The v0.1.0 release was built and previewed on macOS. Its provider parsing and privacy tests pass, but it has not yet received full native Windows validation.
 
+### Windows installer v0.3.4
+
+Windows packaging now produces a Setup EXE containing both x64 and ARM64 apps, alongside the portable ZIPs. It installs for the current Windows user, creates Start menu and desktop shortcuts, and includes uninstall support. Preferences are retained during upgrades and uninstall. Signing and native install/upgrade/uninstall validation remain pending.
+
 ## Reported Windows problems
 
 These are confirmed product gaps in the v0.1.0 implementation:
@@ -186,7 +190,7 @@ These features are expected for closer Mac parity but are not part of the immedi
 - Current coding activity indicators for Claude, Codex, Cursor, and Antigravity.
 - Selectable display for multi-monitor systems.
 - Start at login using an explicit user preference.
-- A signed Windows installer after native behavior is stable.
+- Signing the Windows installer after native behavior is stable.
 - Windows code signing and release provenance.
 - Accessibility and keyboard navigation review on Windows.
 - Light/high-contrast theme adaptation if the Windows environment requests it.

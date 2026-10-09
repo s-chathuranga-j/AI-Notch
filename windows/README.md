@@ -1,10 +1,14 @@
 # AI Notch for Windows
 
-A tray application with a thin black notch at any screen edge. Hover to reveal logos and percentages, then hover a logo for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.3 release notes](RELEASE-NOTES.md).
+A tray application with a thin black notch at any screen edge. Hover to reveal logos and percentages, then hover a logo for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.4 release notes](RELEASE-NOTES.md).
 
 ## Run on Windows
 
-Extract the complete ZIP into a permanent folder and run **AI Notch.exe**. Keep the supporting files beside it. This is an unsigned portable build, not an installer; Windows may show an unknown-publisher prompt. Windows 10/11 x64 and ARM64 builds are packaged. Native Windows testing remains required before treating this as a stable release.
+Download **AI-Notch-0.3.4-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.4) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
+
+Quit any existing copy through its tray menu before installing. If you previously used a ZIP, the installed app uses the same saved preferences; your extracted portable folder is left untouched.
+
+Portable ZIPs remain available: extract the complete x64 or ARM64 ZIP into a permanent folder and run **AI Notch.exe**, keeping the supporting files beside it. Windows 10/11 x64 and ARM64 are supported. The installer and app remain unsigned, so Windows may show an unknown-publisher or SmartScreen warning. Native installation testing remains required before treating this as a stable release.
 
 Providers are off by default. Enable Claude or Codex from settings after signing in through their own Windows CLI. Claude reads `%USERPROFILE%\.claude\.credentials.json`; Codex invokes `codex app-server` from PATH with `%USERPROFILE%\.codex` as its configuration directory. This does not read credentials from WSL. Codex is discovered as a native executable on PATH or in the standard npm global vendor-binary locations. Arbitrary shell wrappers are never executed.
 
@@ -31,11 +35,11 @@ npm start
 npm run package
 ```
 
-On macOS the app always uses synthetic sample data and never reads Mac credentials. Windows can preview the same data with `npm start -- --demo`. Packaging produces ZIPs in `dist/` for x64 and ARM64. No signing certificates or publishing service are configured.
+On macOS the app always uses synthetic sample data and never reads Mac credentials. Windows can preview the same data with `npm start -- --demo`. Packaging produces one Setup EXE containing both x64 and ARM64 apps, plus separate portable ZIPs, in `dist/`. No signing certificates or publishing service are configured.
 
 ## Scope
 
-Implemented: experimental GitHub Copilot quotas, Claude OAuth usage, discovered personal/work Claude accounts, Codex app-server usage, per-account opt-in, retry, tray, hover expansion, four screen edges. Cursor, GLM, Antigravity, coding activity indicators, startup-at-login, display selection, and installer integration are not yet ported. Native process discovery, tray behavior, taskbar placement, and authentication must be validated on Windows.
+Implemented: experimental GitHub Copilot quotas, Claude OAuth usage, discovered personal/work Claude accounts, Codex app-server usage, per-account opt-in, retry, tray, hover expansion, four screen edges, and a Windows installer with shortcuts and uninstall support. Cursor, GLM, Antigravity, coding activity indicators, startup-at-login, and display selection are not yet ported. Native installation, process discovery, tray behavior, taskbar placement, and authentication must be validated on Windows.
 
 ## Privacy
 
