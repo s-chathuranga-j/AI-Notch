@@ -1,4 +1,11 @@
-# Windows v0.3.2 validation - 2026-10-09
+# Windows v0.3.3 validation - 2026-10-09
+
+- All 29 Windows tests pass. Both x64 and ARM64 ZIPs built on macOS and passed ZIP integrity checks.
+- Correct executable architecture, AI Notch product name, version 0.3.3, and all nine brain icon images were verified; embedded images match the source ICO byte for byte.
+- Bundled sources match the working files; ZIP executables and app archives match the verified unpacked artifacts. SHA-256 download checksums were generated.
+- Native Windows desktop rendering and live provider authentication were not tested for this artwork edit. Portable builds remain unsigned.
+
+## Windows v0.3.2 validation - 2026-10-09
 
 - All 29 Windows tests pass; `git diff --check` passes.
 - Both x64 and ARM64 ZIPs built on macOS and passed ZIP integrity checks.
