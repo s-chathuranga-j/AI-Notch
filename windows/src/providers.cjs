@@ -36,7 +36,7 @@ async function request(url,token,signal) {
   try { return await r.json(); } catch { throw new Error("Provider returned an unreadable response."); }
 }
 async function discover(home) {
-  const entries=await fs.readdir(home,{withFileTypes:true});
+  const entries=await fs.readdir(home,{withFileTypes:true}).catch(()=>[]);
   const claude=[{id:'claude',label:'Claude · Personal',kind:'claude',dir:path.join(home,'.claude')}];
   for(const e of entries) if(e.isDirectory() && /^\.claude-[a-zA-Z0-9_-]+$/.test(e.name)) {
     const dir=path.join(home,e.name);
@@ -61,7 +61,10 @@ async function claude(account,signal) {
 function parseCodex(result) {
   const rates=result?.rateLimits;
   return [['primary','Session'],['secondary','Weekly']].flatMap(([key,label])=>{
-    const w=rates?.[key]; return typeof w?.usedPercent==='number' && Number.isFinite(w.usedPercent) ? [{label,percent:w.usedPercent,reset:w.resetsAt?new Date(w.resetsAt*1000).toISOString():null}]:[];
+    const w=rates?.[key];
+    if(typeof w?.usedPercent!=='number'||!Number.isFinite(w.usedPercent))return [];
+    const date=typeof w.resetsAt==='number'&&w.resetsAt>0?new Date(w.resetsAt*1000):null;
+    return [{label,percent:w.usedPercent,reset:date&&Number.isFinite(date.getTime())?date.toISOString():null}];
   });
 }
 function codexExecutable() {
@@ -87,9 +90,11 @@ function codex(account,signal) {
     child.on('error',()=>finish(new Error('Codex CLI not found. Install Codex CLI and sign in.')));
     child.on('exit',()=>finish(new Error('Codex closed before returning usage.')));
     child.stdin.on('error',()=>{});
+    child.stdout.on('error',()=>finish(new Error('Codex connection closed. Retry.')));
     child.stdout.on('data',chunk=>{
       buffer+=chunk.toString(); if(buffer.length>1024*1024)return finish(new Error('Unexpected Codex response.'));
       let n; while((n=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,n);buffer=buffer.slice(n+1);let message;try{message=JSON.parse(line);}catch{continue;}
+        if(!message||typeof message!=='object')continue;
         if(message.id===1){child.stdin.write(JSON.stringify({method:'initialized'})+'\n');child.stdin.write(JSON.stringify({id:2,method:'account/rateLimits/read'})+'\n');}
         if(message.id===2){const windows=parseCodex(message.result);finish(windows.length?null:new Error('No subscription limits. Sign in to Codex with your subscription.'),windows);}
       }
@@ -99,6 +104,7 @@ function codex(account,signal) {
 }
 class Poller {
   constructor(fetcher,publish){this.fetcher=fetcher;this.publish=publish;this.jobs=new Map();this.enabled=new Set();this.last=new Map();}
+  cancelPending(){for(const job of this.jobs.values())job.abort();this.jobs.clear();}
   // Disabling drops the cached reading with everything else, so it cannot reappear on re-enable.
   disable(id){this.enabled.delete(id);this.jobs.get(id)?.abort();this.jobs.delete(id);this.last.delete(id);this.publish(id,{status:'Disabled',windows:[]});}
   async refresh(account){if(!this.enabled.has(account.id)||this.jobs.has(account.id))return;const controller=new AbortController();this.jobs.set(account.id,controller);

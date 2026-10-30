@@ -6,6 +6,22 @@ function logo(kind){
  img.src=`assets/${kind==='claude'?'claude':kind==='copilot'?'copilot':'openai'}.svg`;
  img.className='provider-logo';img.alt=kind==='claude'?'Claude':kind==='copilot'?'GitHub Copilot':'OpenAI';return img;
 }
+function usageRing(account){
+ const ring=text('span','','usage-ring');ring.setAttribute('aria-hidden','true');
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 44 44');
+ const quota=account.enabled&&account.windows.find(w=>Number.isFinite(w.percent));
+ const percent=quota?Math.max(0,Math.min(100,quota.percent)):0;
+ for(const progress of [false,true]){
+  const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  for(const [name,value] of Object.entries({cx:22,cy:22,r:19,fill:'none',class:progress?'ring-progress':'ring-track'}))circle.setAttribute(name,String(value));
+  if(progress){circle.setAttribute('stroke-dasharray',`${percent*2*Math.PI*19/100} ${2*Math.PI*19}`);circle.setAttribute('visibility',percent>0?'visible':'hidden');}
+  svg.append(circle);
+ }
+ ring.append(svg,logo(account.kind));return ring;
+}
+function updateShape(){
+ $('notch-outline').setAttribute('d',notchPath(window.innerWidth,window.innerHeight,current?.position||'top'));
+}
 function usageSummary(account){
  if(!account.enabled)return '—';
  const quota=account.windows.find(w=>Number.isFinite(w.percent));
@@ -15,19 +31,21 @@ function render(state){
  if(!state)return;
  if(state.settings!==current?.settings){selected=null;isExpanded=state.expanded;}
  if(state.visibility==='always')isExpanded=true;
- current=state;document.body.dataset.position=state.position;
+ current=state;document.body.dataset.position=state.position;updateShape();
  $('settings').setAttribute('aria-expanded',String(state.settings));
  document.body.classList.toggle('settings',state.settings);
  $('preferences').hidden=!state.settings;$('position').value=state.position;$('visibility').value=state.visibility||'onHover';
+ $('startup').checked=!!state.startWithWindows;$('startup').disabled=!state.startupAvailable;
+ $('startup-status').textContent=state.startupError||(state.startupAvailable?'':'Available in the installed Windows app.');
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
  $('accounts').replaceChildren();$('compact').replaceChildren();
  for(const a of state.accounts){
   const stale=!!a.stale&&a.enabled&&a.windows.length>0;
   const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}${stale?' stale':''}`);chip.type='button';
-  chip.setAttribute('aria-label',`${a.label}: ${a.enabled?(stale?`${a.status} Showing the last reading.`:a.status):'Disabled'}`);
-  chip.setAttribute('aria-controls','accounts');chip.dataset.account=a.id;
+  chip.setAttribute('aria-label',`${a.label}: ${usageSummary(a)}. ${a.enabled?(stale?`${a.status} Showing the last reading.`:a.status):'Disabled'}`);
+  chip.setAttribute('aria-controls','accounts');chip.dataset.account=a.id;chip.dataset.provider=a.kind;
   chip.onmouseenter=()=>showDetail(a.id);chip.onfocus=()=>showDetail(a.id);chip.onclick=()=>showDetail(a.id);
-  chip.append(logo(a.kind),text('span',usageSummary(a)));
+  chip.append(usageRing(a),text('span',usageSummary(a)));
   if(stale)chip.append(text('span','⚠','warn'));
   $('compact').append(chip);
   const row=text('article','',stale?'stale':undefined);row.dataset.account=a.id;row.dataset.provider=a.kind;
@@ -65,8 +83,10 @@ $('settings').onclick=()=>{clearTimeout(timer);window.notch.settings();};
 $('retry').onclick=()=>window.notch.retry();
 $('position').onchange=e=>window.notch.position(e.target.value);
 $('visibility').onchange=e=>window.notch.visibility(e.target.value);
+$('startup').onchange=e=>window.notch.startup(e.target.checked).catch(()=>{$('startup-status').textContent='Windows could not change startup settings. Try again.';});
 document.body.onmouseenter=expand;
 document.body.onmouseleave=()=>{clearTimeout(timer);timer=setTimeout(collapse,350);};
 document.body.onfocusin=expand;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(current?.settings)window.notch.settings();else collapse();}});
 window.notch.onState(render);window.notch.state().then(render);
+window.addEventListener('resize',updateShape);

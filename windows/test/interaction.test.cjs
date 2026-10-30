@@ -9,11 +9,11 @@ function setup(){
   replaceChildren(){this.children=[];}
   setAttribute(key,value){this.attributes[key]=value;}
  }
- const ids=Object.fromEntries(['settings','preferences','position','visibility','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
+ const ids=Object.fromEntries(['settings','preferences','position','visibility','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
  const body=new Element();const calls=[];let callback;let delayed;
  const state={settings:false,expanded:false,position:'left',demo:true,accounts:['claude','codex'].map(id=>({id,kind:id,label:id,enabled:true,status:'Updated',windows:[{label:'Session',percent:25}],updated:Date.now()}))};
- const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){}};
- vm.runInNewContext(fs.readFileSync(require.resolve('../src/renderer.js'),'utf8'),{document:{body,getElementById:id=>ids[id],createElement:()=>new Element(),addEventListener(){}},window:{notch},setTimeout:fn=>{delayed=fn;return 1;},clearTimeout:()=>{delayed=null;}});
+ const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){},startup:on=>{calls.push(['startup',on]);return Promise.resolve();}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../src/renderer.js'),'utf8'),{notchPath:require('../src/notch-shape.js').notchPath,document:{body,getElementById:id=>ids[id],createElement:()=>new Element(),createElementNS:()=>new Element(),addEventListener(){}},window:{notch,innerWidth:420,innerHeight:400,addEventListener(){}},setTimeout:fn=>{delayed=fn;return 1;},clearTimeout:()=>{delayed=null;}});
  return {ids,body,calls,state,push:callback,leave:()=>{body.onmouseleave();delayed?.();}};
 }
 test('hover first reveals overview, then only the selected account; leaving collapses',()=>{
@@ -24,6 +24,23 @@ test('hover first reveals overview, then only the selected account; leaving coll
  ui.ids.compact.children[1].onmouseenter();assert.deepEqual(ui.ids.accounts.children.map(row=>row.hidden),[true,false]);
  ui.leave();assert.ok(!ui.body.classes.has('expanded'));assert.ok(!ui.body.classes.has('details'));
  assert.deepEqual(ui.calls.at(-1),['expand',false]);
+});
+test('startup checkbox reflects Windows status and explicitly requests a change',async()=>{
+ const ui=setup();assert.equal(ui.ids.startup.disabled,true);
+ ui.push({...ui.state,settings:true,startupAvailable:true,startWithWindows:true});
+ assert.equal(ui.ids.startup.disabled,false);assert.equal(ui.ids.startup.checked,true);
+ await ui.ids.startup.onchange({target:{checked:false}});
+ assert.deepEqual(ui.calls.at(-1),['startup',false]);
+ ui.push({...ui.state,startupAvailable:true,startWithWindows:false,startupError:'Windows could not change startup settings.'});
+ assert.equal(ui.ids.startup.checked,false);assert.match(ui.ids['startup-status'].textContent,/could not/);
+});
+test('usage rings draw the actual percentage and the bezel has curved corners',()=>{
+ const ui=setup();
+ const ring=ui.ids.compact.children[0].children[0].children[0];
+ const progress=ring.children[1].attributes;
+ const [used,total]=progress['stroke-dasharray'].split(' ').map(Number);
+ assert.ok(Math.abs(used/total-.25)<1e-12);assert.equal(progress.visibility,'visible');
+ assert.match(ui.ids['notch-outline'].attributes.d,/A /);
 });
 test('settings hover clears details; clicking opens settings and leaving keeps them open',()=>{
  const ui=setup();ui.body.onmouseenter();ui.ids.compact.children[0].onmouseenter();ui.ids.settings.onmouseenter();

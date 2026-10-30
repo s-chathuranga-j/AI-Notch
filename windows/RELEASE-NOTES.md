@@ -1,4 +1,17 @@
-# AI Notch for Windows v0.3.4 — Preview
+# AI Notch for Windows v0.3.5 — Preview
+
+The Windows notch now uses the Mac's flared outline and 44-pixel circular usage rings on all four screen edges.
+
+- Added **Start with Windows** in Settings. Enable it once to register the installed executable, replacing any old Startup-folder shortcut to a ZIP copy. The switch reflects Windows startup approval; the app does not silently re-enable a disabled registration.
+- Recreates a lost window, reloads a crashed or unresponsive renderer, and repositions and refreshes after sleep, unlock, or display changes. Intentional Quit and Windows shutdown remain respected.
+- Handles unexpected JavaScript failures with a bounded restart and a visible message if recovery repeatedly fails.
+- Fixed Codex output handling: null messages, invalid reset timestamps, and broken output streams no longer escape the provider error handler and crash the app.
+- “Show AI Notch” genuinely restores Hidden mode. Preferences are written atomically.
+- Local rotating lifecycle logs record fixed event/error categories, never account names, credentials, provider responses, raw exception messages, or stacks. They are never uploaded.
+
+54 tests pass. The real Electron demo on macOS was checked at all four edges and recovered from a deliberately crashed renderer with its four usage readings intact. Native Windows boot, sleep/GPU-driver behavior, installer execution, and live account authentication remain untested on this Mac. The installer and app remain unsigned previews.
+
+## Earlier release: Windows v0.3.4
 
 Windows now has a Setup EXE. Run it to install AI Notch for your Windows user, create Start menu and desktop shortcuts, and launch the app. The same installer selects the native x64 or ARM64 app. Uninstall from Windows Settings; saved preferences are preserved during upgrades and uninstall.
 

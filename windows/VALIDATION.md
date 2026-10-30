@@ -1,4 +1,13 @@
-# Windows v0.3.4 validation - 2026-10-09
+# Windows v0.3.5 validation - 2026-10-30
+
+- 54 tests pass, including startup status and consent, IPC frame/type validation, missing-window recovery, renderer and main-process recovery bounds, explicit Quit/shutdown behavior, suspend/resume, transient zero-sized displays, restored Hidden mode, atomic settings, log redaction/rotation, and Codex malformed-output handling.
+- The shape uses the macOS canonical flare/corner geometry and transforms on all four edges. Circular usage rings draw clamped real percentages. Existing provider destination, cancellation, stale-reading, and opt-in tests remain passing.
+- Real Electron demo checked on macOS through Playwright: top/bottom/left/right shapes, usage rings, Settings and startup preview state; zero renderer console errors after the CSP check. A deliberate Chromium renderer crash recovered and all four synthetic readings were restored. The demo/debugging session was shut down after validation.
+- NSIS per-user Setup and x64/ARM64 ZIPs built successfully. The installer includes a per-user startup cleanup hook that preserves registration during updates.
+- Final installer and ZIP integrity checks pass. Setup and its embedded uninstaller have the correct version, all nine brain icon sizes, and non-elevating manifests. Both extracted native executables and app archives match the verified unpacked builds; every bundled source file matches the working source. SHA-256 checksums cover all three downloads.
+- Native Windows login/startup approval, sleep/graphics-driver behavior, installation, upgrade/uninstall, and live account authentication were not exercised on this Mac. Native main-process crashes or OS/security-tool termination cannot be guaranteed to recover through JavaScript handlers. Builds remain unsigned previews.
+
+## Windows v0.3.4 validation - 2026-10-09
 
 - All 29 Windows tests pass. The universal NSIS Setup EXE and x64/ARM64 portable ZIPs built on macOS arm64 using the pinned NSIS 1.2.1 toolset (compiler 3.12).
 - Installer and ZIP integrity checks pass. Both embedded native payloads contain the exact executable and app archive from the verified unpacked builds; portable ZIP payloads match too.

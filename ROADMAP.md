@@ -56,6 +56,8 @@ Windows packaging now produces a Setup EXE containing both x64 and ARM64 apps, a
 
 ## Reported Windows problems
 
+Windows v0.3.5 adds the Mac's flared outline and circular usage rings, an opt-in Start with Windows setting, window/renderer recovery, sleep/unlock restoration, and bounded local lifecycle diagnostics. Its Windows login and hardware-specific behavior still need native validation; see the Windows release notes and validation record.
+
 These are confirmed product gaps in the v0.1.0 implementation:
 
 1. Usage is drawn as horizontal progress bars instead of the circular rings used on macOS.
@@ -189,7 +191,6 @@ These features are expected for closer Mac parity but are not part of the immedi
 - Antigravity quota through its local Windows language-server bridge.
 - Current coding activity indicators for Claude, Codex, Cursor, and Antigravity.
 - Selectable display for multi-monitor systems.
-- Start at login using an explicit user preference.
 - Signing the Windows installer after native behavior is stable.
 - Windows code signing and release provenance.
 - Accessibility and keyboard navigation review on Windows.

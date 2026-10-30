@@ -22,3 +22,23 @@ test('an account that never had a reading reports the failure without inventing 
  p.enabled.add('a');await p.refresh({id:'a'});
  assert.deepEqual(rows.at(-1),{status:'Sign in again in Claude Code, then Retry.',windows:[]});
 });
+test('an unavailable home directory does not prevent the default accounts from starting',async()=>{
+ const home=path.join(os.tmpdir(),'ainotch-missing-home-'+require('node:crypto').randomUUID());
+ const accounts=await discover(home);
+ assert.deepEqual(accounts.map(a=>a.id),['claude','codex','copilot']);
+});
+test('sleep cancels old work while preserving opt-in and allowing an immediate fresh request',async()=>{
+ const work=[];const rows=[];
+ const p=new Poller((_a,signal)=>new Promise(resolve=>work.push({resolve,signal})),(_id,row)=>rows.push(row));
+ p.enabled.add('a');const old=p.refresh({id:'a'});p.cancelPending();
+ assert.equal(work[0].signal.aborted,true);assert.equal(p.enabled.has('a'),true);
+ const fresh=p.refresh({id:'a'});work[1].resolve([{percent:20}]);await fresh;
+ work[0].resolve([{percent:90}]);await old;
+ assert.equal(rows.at(-1).windows[0].percent,20);
+});
+test('notch shape and startup controls keep the strict renderer CSP without inline code or styles',async()=>{
+ const html=await fs.readFile(require.resolve('../src/index.html'),'utf8');
+ assert.match(html,/script-src 'self'; style-src 'self'/);
+ assert.ok(!html.includes('unsafe-inline'));
+ assert.doesNotMatch(html,/\s(?:style|on\w+)=/i);
+});
