@@ -1,6 +1,5 @@
 import Foundation
 import Security
-import LocalAuthentication
 
 /// The OAuth token Claude Code keeps in the login keychain.
 ///
@@ -43,17 +42,19 @@ struct ClaudeCredentials {
     /// authorization to read — only this second, targeted fetch of the
     /// winner's actual data does, which is why it costs the same single prompt
     /// as before, per profile.
-    static func read(service: String, allowInteraction: Bool = false) throws -> ClaudeCredentials {
-        guard let winner = KeychainItem.newest(service: service) else {
+    fileprivate static func read(service: String) throws -> ClaudeCredentials {
+        guard let winner = try KeychainItem.newest(service: service) else {
             Log.usage.error("keychain read failed: no item under \(service, privacy: .public)")
             throw UsageProviderError.needsAuth
         }
 
         var item: CFTypeRef?
-        let status = SecItemCopyMatching(
-            query(for: winner.persistentRef, allowInteraction: allowInteraction) as CFDictionary,
-            &item
-        )
+        let status = SecItemCopyMatching([
+            kSecClass: kSecClassGenericPassword,
+            kSecValuePersistentRef: winner.persistentRef,
+            kSecReturnData: true,
+            kSecMatchLimit: kSecMatchLimitOne
+        ] as CFDictionary, &item)
 
         guard status == errSecSuccess, let data = item as? Data else {
             // Automatic checks cannot summon the password dialog. A denied
@@ -86,22 +87,6 @@ struct ClaudeCredentials {
         )
     }
 
-    /// Kept separate so tests can prove routine reads forbid Keychain UI.
-    static func query(for persistentRef: Data, allowInteraction: Bool) -> [CFString: Any] {
-        var query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecValuePersistentRef: persistentRef,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne
-        ]
-        if !allowInteraction {
-            let context = LAContext()
-            context.interactionNotAllowed = true
-            query[kSecUseAuthenticationContext] = context
-        }
-        return query
-    }
-
     /// Which keychain refusal this was. "Not found" means Claude Code has never
     /// signed in; -25308 or -128 mean the item exists but this app is not on its
     /// access list. Those need entirely different advice, so the log says which.
@@ -115,6 +100,7 @@ struct ClaudeCredentials {
         status == errSecAuthFailed
             || status == errSecUserCanceled
             || status == errSecInteractionNotAllowed
+            || status == errSecInDarkWake
     }
 
     static func explain(_ status: OSStatus) -> String {
@@ -136,8 +122,6 @@ struct ClaudeCredentials {
 /// cache shared between them would hand the personal token to the work ring.
 final class ClaudeKeychain: @unchecked Sendable {
     let service: String
-    private let interactionLock = NSLock()
-    private var allowNextInteraction = false
 
     /// Read once, then held until the token expires — see `CredentialCache`.
     /// Claude Code rotates this roughly hourly, so this is about one keychain
@@ -159,29 +143,17 @@ final class ClaudeKeychain: @unchecked Sendable {
     /// Reads whatever is stored, expired or not. Judging expiry is the caller's
     /// job, because "signed out" and "the token has aged out overnight" call for
     /// different behaviour and only one of them is worth alarming anyone about.
-    func load() throws -> ClaudeCredentials {
-        try cache.value(
-            itemModifiedAt: { KeychainItem.modifiedAt(service: service) },
-            reload: { try ClaudeCredentials.read(service: service,
-                                                  allowInteraction: takeInteractionPermission()) }
-        )
+    func load(allowingInteraction: Bool = false) throws -> ClaudeCredentials {
+        try KeychainItem.withInteraction(allowed: allowingInteraction) {
+            if allowingInteraction { cache.forget() }
+            return try cache.value(
+                itemModifiedAt: { KeychainItem.modifiedAt(service: service) },
+                reload: { try ClaudeCredentials.read(service: service) }
+            )
+        }
     }
 
-    /// One explicit Settings action authorizes one interactive attempt.
-    func authorizeNextRead() {
-        interactionLock.lock()
-        allowNextInteraction = true
-        interactionLock.unlock()
-        cache.forget()
-    }
-
-    private func takeInteractionPermission() -> Bool {
-        interactionLock.lock()
-        defer { interactionLock.unlock() }
-        let allowed = allowNextInteraction
-        allowNextInteraction = false
-        return allowed
-    }
+    var cachedCredential: ClaudeCredentials? { cache.cached }
 
     /// Forget the held copy. Call when the server rejects it: signing into a
     /// different account replaces the keychain item, and the copy in hand is

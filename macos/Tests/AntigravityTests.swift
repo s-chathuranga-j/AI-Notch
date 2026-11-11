@@ -437,10 +437,7 @@ final class CredentialCacheTests: XCTestCase {
         XCTAssertEqual(reads, 2, "it never looked again at all")
     }
 
-    /// One refusal must not become a refusal a minute. macOS said no; asking
-    /// again on the next tick is what the user experiences as "it keeps asking
-    /// even though I chose Always Allow".
-    func testARefusalIsNeverRetriedWhileTheItemIsUnchanged() {
+    func testARefusalIsRetriedAfterTheCooldownEvenIfTheItemIsUnchanged() {
         struct Denied: Error {}
         var reads = 0
         var clock = Date(timeIntervalSince1970: 0)
@@ -456,14 +453,19 @@ final class CredentialCacheTests: XCTestCase {
         }
         XCTAssertEqual(reads, 2)
 
-        // An hour of ticks against an item that has not moved again.
-        for _ in 0..<60 {
-            clock.addTimeInterval(60)
-            _ = try? cache.value(itemModifiedAt: { stamp }) { () -> Token in
-                reads += 1; throw Denied()
-            }
+        clock.addTimeInterval(60)
+        XCTAssertThrowsError(try cache.value(itemModifiedAt: { stamp }) {
+            reads += 1; return Token(expired: false)
+        })
+        XCTAssertEqual(reads, 2, "a refusal was retried before the cooldown")
+
+        // Unlocking the Keychain can make the same item readable again.
+        clock.addTimeInterval(5 * 60)
+        let token = try? cache.value(itemModifiedAt: { stamp }) {
+            reads += 1; return Token(expired: false)
         }
-        XCTAssertEqual(reads, 2, "a refusal was retried \(reads - 2) more times")
+        XCTAssertEqual(token?.expired, false)
+        XCTAssertEqual(reads, 3)
     }
 
     /// A rotation is the exception, and has to be: the old secret is gone, so
@@ -830,6 +832,10 @@ final class ReauthorizeTests: XCTestCase {
         // Swift quietly falls back to the extension's no-op default — the
         // test then passes or fails for the wrong reason.
         nonisolated func forgetCachedCredential() { forgotten += 1 }
+        func fetchSnapshot(allowingCredentialAccess: Bool) async throws -> ProviderSnapshot {
+            if allowingCredentialAccess { forgetCachedCredential() }
+            return try await fetchSnapshot()
+        }
         func fetchSnapshot() async throws -> ProviderSnapshot {
             fetches += 1
             return ProviderSnapshot(id: id, displayName: displayName, glyph: glyph,

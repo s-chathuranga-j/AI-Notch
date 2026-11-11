@@ -37,8 +37,7 @@ final class CredentialCache<Credential>: @unchecked Sendable {
     /// the item moved. Long enough not to nag, short enough that a rotation is
     /// picked up while you are still looking at the notch.
     private let recheckAfter: TimeInterval
-    /// How long to leave macOS alone after it has said no, where there is no
-    /// probe to be more precise with.
+    /// How long to leave macOS alone after it has said no to the same item.
     private let retryAfterFailure: TimeInterval
     private let now: () -> Date
 
@@ -50,6 +49,12 @@ final class CredentialCache<Credential>: @unchecked Sendable {
         self.retryAfterFailure = retryAfterFailure
         self.now = now
         self.isExpired = isExpired
+    }
+
+    var cached: Credential? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
     }
 
     /// The held credential, or a fresh one when the item behind it has moved.
@@ -78,14 +83,13 @@ final class CredentialCache<Credential>: @unchecked Sendable {
 
         // Have we already put this exact version of the item to macOS?
         let alreadyAsked: Bool
-        if let current, let askedStamp {
-            // The probe settles it outright: the same item can only give the
-            // same answer, whether that answer was a token or a refusal.
-            alreadyAsked = current == askedStamp
+        if let current, let askedStamp, current != askedStamp {
+            alreadyAsked = false
+        } else if current != nil, askedStamp != nil, failure == nil {
+            alreadyAsked = true
         } else if let askedAt {
-            // Nothing to compare against, so wait it out instead — and wait
-            // longer after a refusal, because a refusal retried on a timer is
-            // precisely what this exists to stop.
+            // An unlock or an approval in Keychain Access can change a refusal
+            // without changing the item's timestamp.
             let wait = failure == nil ? recheckAfter : retryAfterFailure
             alreadyAsked = now().timeIntervalSince(askedAt) < wait
         } else {
@@ -93,10 +97,8 @@ final class CredentialCache<Credential>: @unchecked Sendable {
         }
 
         if alreadyAsked {
-            if let held { return held }
-            // Nothing held and macOS has already refused this item: give back
-            // the same answer rather than raising the same dialogue again.
             if let failure { throw failure }
+            if let held { return held }
         }
 
         do {

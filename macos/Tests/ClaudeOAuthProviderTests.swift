@@ -1,18 +1,25 @@
 import XCTest
 import Security
-import LocalAuthentication
 @testable import AINotch
 
 final class ClaudeKeychainPromptTests: XCTestCase {
-    func testRoutineReadForbidsSystemAuthenticationUI() {
-        let query = ClaudeCredentials.query(for: Data([1, 2, 3]), allowInteraction: false)
-        let context = query[kSecUseAuthenticationContext] as? LAContext
-        XCTAssertEqual(context?.interactionNotAllowed, true)
-    }
+    func testFailedSilentReadRestoresInteractionForTheNextExplicitRead() throws {
+        var original: DarwinBoolean = false
+        XCTAssertEqual(SecKeychainGetUserInteractionAllowed(&original), errSecSuccess)
+        defer { SecKeychainSetUserInteractionAllowed(original.boolValue) }
+        XCTAssertEqual(SecKeychainSetUserInteractionAllowed(true), errSecSuccess)
 
-    func testExplicitApprovalCanShowSystemAuthenticationUI() {
-        let query = ClaudeCredentials.query(for: Data([1, 2, 3]), allowInteraction: true)
-        XCTAssertNil(query[kSecUseAuthenticationContext])
+        XCTAssertThrowsError(try KeychainItem.withInteraction(allowed: false) {
+            var allowed: DarwinBoolean = true
+            XCTAssertEqual(SecKeychainGetUserInteractionAllowed(&allowed), errSecSuccess)
+            XCTAssertFalse(allowed.boolValue)
+            throw UsageProviderError.accessDenied
+        })
+        try KeychainItem.withInteraction(allowed: true) {
+            var allowed: DarwinBoolean = false
+            XCTAssertEqual(SecKeychainGetUserInteractionAllowed(&allowed), errSecSuccess)
+            XCTAssertTrue(allowed.boolValue)
+        }
     }
 }
 

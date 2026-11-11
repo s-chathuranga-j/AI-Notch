@@ -105,7 +105,9 @@ extension UsageProvider {
     /// Providers that hold nothing in memory have nothing to drop.
     func forgetCachedCredential() {}
 
-    func authorizeCredentialAccess() { forgetCachedCredential() }
+    func fetchSnapshot(allowingCredentialAccess: Bool) async throws -> ProviderSnapshot {
+        return try await fetchSnapshot()
+    }
 }
 
 /// A provider as the settings sheet needs it.

@@ -41,8 +41,8 @@ protocol UsageProvider {
     /// and no prompt appears. A requirement, not an extension member, for the
     /// reason spelled out above `account()`.
     func forgetCachedCredential()
-    /// Request Keychain interaction only after the user presses Allow access.
-    func authorizeCredentialAccess()
+    /// Request Keychain interaction for this fetch after the user presses Allow access.
+    func fetchSnapshot(allowingCredentialAccess: Bool) async throws -> ProviderSnapshot
 }
 
 enum UsageProviderError: Error {

@@ -30,6 +30,9 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.6", headline: "Claude refreshes stay quiet.", changes: [
+            .init(title: "Approve access from Settings", detail: "Background refreshes keep the last reading if the Keychain is locked or needs approval. If a Claude login needs permission, choose Allow access in Settings, then Always Allow in the macOS dialog.")
+        ]),
         ReleaseNote(version: "0.3.5", headline: "Claude readings after a reset.", changes: [
             .init(title: "Keep the percentage Claude reports", detail: "A missing reset time no longer hides a valid percentage, including 0%. If Claude sends no reading, AI Notch keeps the last reading it received.")
         ]),

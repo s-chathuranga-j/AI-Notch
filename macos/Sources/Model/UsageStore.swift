@@ -220,7 +220,7 @@ final class UsageStore: ObservableObject {
     /// Deliberately not routed through `refreshNow`: asking one cell for a fresh
     /// reading should not spend every other provider's rate-limit budget, and
     /// Claude's in particular is easy to exhaust.
-    func refresh(providerID: String) {
+    func refresh(providerID: String, allowingCredentialAccess: Bool = false) {
         guard let provider = providers.first(where: { $0.id == providerID }),
               !disconnected.contains(providerID), !refreshing.contains(providerID),
               providerTasks[providerID] == nil else { return }
@@ -232,7 +232,8 @@ final class UsageStore: ObservableObject {
                 if self.providerTasks[providerID] == nil { self.refreshing.remove(providerID) }
             }
             guard self.generations[providerID, default: 0] == generation,
-                  let fresh = await self.snapshot(from: provider),
+                  let fresh = await self.snapshot(from: provider,
+                                                  allowingCredentialAccess: allowingCredentialAccess),
                   !self.disconnected.contains(providerID),
                   self.generations[providerID, default: 0] == generation else { return }
             if let index = self.snapshots.firstIndex(where: { $0.id == providerID }) {
@@ -295,8 +296,7 @@ final class UsageStore: ObservableObject {
     /// whenever the token is still valid, so the keychain is never touched and
     /// the prompt never returns — the button would appear to do nothing.
     func reauthorize(providerID: String) {
-        providers.first { $0.id == providerID }?.authorizeCredentialAccess()
-        refresh(providerID: providerID)
+        refresh(providerID: providerID, allowingCredentialAccess: true)
     }
 
     /// Take the user to where this provider's account is *changed*.
@@ -328,13 +328,14 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    private func snapshot(from provider: UsageProvider) async -> ProviderSnapshot? {
+    private func snapshot(from provider: UsageProvider,
+                          allowingCredentialAccess: Bool = false) async -> ProviderSnapshot? {
         guard !disconnected.contains(provider.id), !Task.isCancelled,
               providerTasks[provider.id] == nil else { return nil }
         let generation = generations[provider.id, default: 0]
         let task = Task { () throws -> ProviderSnapshot in
             try Task.checkCancellation()
-            return try await provider.fetchSnapshot()
+            return try await provider.fetchSnapshot(allowingCredentialAccess: allowingCredentialAccess)
         }
         providerTasks[provider.id] = task
         refreshing.insert(provider.id)

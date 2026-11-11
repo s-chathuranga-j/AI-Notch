@@ -56,6 +56,14 @@ actor ClaudeOAuthProvider: UsageProvider {
     }
 
     func fetchSnapshot() async throws -> ProviderSnapshot {
+        try await fetchSnapshot(allowingCredentialAccess: false)
+    }
+
+    func fetchSnapshot(allowingCredentialAccess: Bool) async throws -> ProviderSnapshot {
+        if allowingCredentialAccess {
+            try Task.checkCancellation()
+            _ = try keychain.load(allowingInteraction: true)
+        }
         if let retryNoEarlierThan, retryNoEarlierThan > Date() {
             let remaining = retryNoEarlierThan.timeIntervalSinceNow
             Log.usage.debug("skipping fetch, backing off for \(remaining, format: .fixed(precision: 0))s")
@@ -188,8 +196,6 @@ actor ClaudeOAuthProvider: UsageProvider {
         return max(0, date.timeIntervalSinceNow)
     }
 
-    /// Read straight from the keychain item rather than from the cached token,
-    /// so the settings row reflects what the next fetch will actually use.
     nonisolated var signInRoute: SignInRoute {
         // Names the command for a profile, because that is the only way to
         // reach it: plain `claude` signs the default one in, not this.
@@ -199,10 +205,9 @@ actor ClaudeOAuthProvider: UsageProvider {
 
     nonisolated func forgetCachedCredential() { keychain.forgetCached() }
 
-    nonisolated func authorizeCredentialAccess() { keychain.authorizeNextRead() }
-
     nonisolated func account() -> ProviderAccount? {
-        guard let credentials = try? loadCredentials() else { return nil }
+        // Settings renders on the main thread while an explicit read may be waiting on macOS.
+        guard let credentials = keychain.cachedCredential else { return nil }
         return ProviderAccount(
             label: nil,   // the credential carries no address
             plan: credentials.subscriptionType,

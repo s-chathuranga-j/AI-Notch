@@ -239,8 +239,8 @@ private struct AccountRow: View {
                 if isConnected, provider.wasRefusedAccess {
                     Button("Allow access…") { retry(provider.id) }
                         .controlSize(.small)
-                        .help("Asks macOS for \(provider.name)'s current saved login. "
-                              + "A newly rotated Claude Code item may need separate approval.")
+                        .help("Choose Always Allow in the macOS dialog to remember this grant. "
+                              + "A new Claude Code login item may need its own grant.")
                 }
 
                 if isConnected, let destination {

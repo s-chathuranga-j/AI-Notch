@@ -24,6 +24,23 @@ import Security
 /// current one. `kSecMatchLimitAll` against attributes enumerates every
 /// duplicate for free, so the newest is found by comparison rather than luck.
 enum KeychainItem {
+    private static let interactionLock = NSLock()
+
+    static func withInteraction<T>(allowed: Bool, _ read: () throws -> T) throws -> T {
+        interactionLock.lock()
+        defer { interactionLock.unlock() }
+        if allowed { return try read() }
+
+        // LAContext does not suppress dialogs from the file-based login keychain.
+        var previous: DarwinBoolean = false
+        guard SecKeychainGetUserInteractionAllowed(&previous) == errSecSuccess,
+              SecKeychainSetUserInteractionAllowed(false) == errSecSuccess else {
+            throw UsageProviderError.accessDenied
+        }
+        defer { SecKeychainSetUserInteractionAllowed(previous.boolValue) }
+        return try read()
+    }
+
     /// One matching item, without its secret: when the owning app last wrote
     /// it, and a handle that can fetch its data later without searching again.
     struct Match {
@@ -38,7 +55,7 @@ enum KeychainItem {
     /// none or macOS declined to say. Ties do not arise in practice —
     /// `kSecAttrModificationDate` is a timestamp, not a version counter — and
     /// where they would, either duplicate is an equally good answer.
-    static func newest(service: String, account: String? = nil) -> Match? {
+    static func newest(service: String, account: String? = nil) throws -> Match? {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -49,8 +66,12 @@ enum KeychainItem {
         if let account { query[kSecAttrAccount] = account }
 
         var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess
-        else { return nil }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else {
+            if ClaudeCredentials.wasRefused(status) { throw UsageProviderError.accessDenied }
+            throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
+        }
 
         // A single match still comes back as one dictionary rather than an
         // array of one — `kSecMatchLimitAll` promises "every match", not "an
@@ -78,6 +99,6 @@ enum KeychainItem {
     /// When the owning app last wrote the newest item under this service, or
     /// nil if there is no such item or macOS declined to say.
     static func modifiedAt(service: String, account: String? = nil) -> Date? {
-        newest(service: service, account: account)?.modifiedAt
+        try? newest(service: service, account: account)?.modifiedAt
     }
 }
