@@ -1,14 +1,2 @@
-<?xml version="1.0" standalone="yes"?>
-<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
-    <channel>
-        <title>AI Notch</title>
-        <item>
-            <title>0.3.7</title>
-            <pubDate>Wed, 11 Nov 2026 19:10:39 +0100</pubDate>
-            <sparkle:version>10</sparkle:version>
-            <sparkle:shortVersionString>0.3.7</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/s-chathuranga-j/AI-Notch/releases/download/macos-v0.3.7/AI-Notch-0.3.7-macOS-universal.dmg" length="4689712" type="application/octet-stream" sparkle:edSignature="cnW/Rrx39cyKxs3eBXDDMtNNNnfmiY7/iY3KXF1/NpXyhKwwxlR0xhOmxnQ7jjVNZrOjoI1ARv1FDFd37VG4Bw=="/>
-        </item>
-    </channel>
-</rss>
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"><channel><title>AI Notch for macOS</title></channel></rss>
