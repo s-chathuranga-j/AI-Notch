@@ -13,12 +13,13 @@ settings:
     SWIFT_VERSION: "5.0"
     SWIFT_STRICT_CONCURRENCY: minimal
     MARKETING_VERSION: "0.3.7"
-    CURRENT_PROJECT_VERSION: "10"
+    CURRENT_PROJECT_VERSION: "11"
     CODE_SIGN_IDENTITY: "-"
     CODE_SIGN_STYLE: Manual
     CODE_SIGNING_REQUIRED: "YES"
     CODE_SIGNING_ALLOWED: "YES"
-    ENABLE_HARDENED_RUNTIME: "YES"
+    # Ad-hoc builds have no Team ID for loading Sparkle; enable with Developer ID signing.
+    ENABLE_HARDENED_RUNTIME: "NO"
     ENABLE_APP_SANDBOX: "NO"
     ENABLE_USER_SCRIPT_SANDBOXING: "NO"
 targets:
