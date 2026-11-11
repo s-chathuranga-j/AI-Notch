@@ -59,6 +59,8 @@ enum UsageProviderError: Error {
     case credentialExpired
     /// The endpoint answered, but not with anything we understand.
     case badResponse(status: Int)
+    /// No usable reading arrived; keep any last good reading.
+    case noUsageReading
     /// Asked to slow down. Carries the server's own retry hint when it gave one.
     case rateLimited(retryAfter: TimeInterval)
     /// The account is readable, but there is genuinely no quota being counted —

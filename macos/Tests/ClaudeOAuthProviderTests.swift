@@ -98,6 +98,25 @@ final class ClaudeOAuthProviderTests: XCTestCase {
 
     // MARK: - Helpers
 
+    func testResetShowsZeroAndEmptyResponseDoesNotReplaceIt() async throws {
+        StubEndpoint.reset([
+            .init(status: 200, body: Data("""
+                {"five_hour":{"utilization":0,"resets_at":null}}
+                """.utf8)),
+            .init(status: 200, body: Data("{}".utf8))
+        ])
+        let provider = makeProvider(source: CredentialSource(readable: true))
+        let snapshot = try await provider.fetchSnapshot()
+        XCTAssertEqual(snapshot.headlineText, "0%")
+        XCTAssertNil(snapshot.headline?.resetsAt)
+        do {
+            _ = try await provider.fetchSnapshot()
+            XCTFail("An empty response must not be accepted as a fresh reading")
+        } catch UsageProviderError.noUsageReading {
+            // The store can retain the last real reading.
+        }
+    }
+
     private static let usagePayload = Data("""
     {"limits":[{"kind":"session","percent":42,"resets_at":"2099-01-01T00:00:00Z"}]}
     """.utf8)

@@ -30,6 +30,9 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.5", headline: "Claude readings after a reset.", changes: [
+            .init(title: "Keep the percentage Claude reports", detail: "A missing reset time no longer hides a valid percentage, including 0%. If Claude sends no reading, AI Notch keeps the last reading it received.")
+        ]),
         ReleaseNote(version: "0.3.4", headline: "A brain for AI Notch.", changes: [
             .init(title: "Brain icon", detail: "A small brain replaces the sparkle in AI Notch's icon on macOS and Windows.")
         ]),

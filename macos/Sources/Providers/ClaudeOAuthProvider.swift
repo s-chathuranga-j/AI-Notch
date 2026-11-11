@@ -77,6 +77,7 @@ actor ClaudeOAuthProvider: UsageProvider {
             // the keychain was never read again.
             throw UsageProviderError.needsAuth
         } catch UsageProviderError.credentialExpired {
+            Log.usage.notice("Claude Code sign-in expired")
             throw UsageProviderError.credentialExpired
         } catch let error as UsageProviderError {
             if case .rateLimited(let retryAfter) = error {
@@ -125,14 +126,26 @@ actor ClaudeOAuthProvider: UsageProvider {
             throw UsageProviderError.badResponse(status: status)
         }
 
-        let payload = try Self.decoder.decode(UsageResponse.self, from: data)
+        let payload: UsageResponse
+        do {
+            payload = try Self.decoder.decode(UsageResponse.self, from: data)
+        } catch {
+            Log.usage.notice("Claude usage response could not be decoded")
+            throw UsageProviderError.noUsageReading
+        }
+        let windows = payload.limitWindows()
+        guard !windows.isEmpty else {
+            Log.usage.notice("Claude usage response had no readings")
+            throw UsageProviderError.noUsageReading
+        }
+        Log.usage.info("Claude usage refreshed")
         return ProviderSnapshot(
             id: id,
             displayName: displayName,
             glyph: glyph,
             fidelity: .official,
             status: .ok,
-            windows: payload.limitWindows(),
+            windows: windows,
             headlineID: "session"
         )
     }
@@ -238,13 +251,12 @@ struct UsageResponse: Decodable {
     /// Anthropic adds them — so it is preferred, with the two named windows as
     /// a fallback for older responses.
     func limitWindows() -> [LimitWindow] {
-        var windows = (limits ?? []).compactMap { limit -> LimitWindow? in
-            guard let resetsAt = limit.resetsAt else { return nil }
-            return LimitWindow(
+        var windows = (limits ?? []).map { limit in
+            LimitWindow(
                 id: limit.kind,
                 label: UsageResponse.label(forKind: limit.kind),
                 usedFraction: limit.percent / 100,
-                resetsAt: resetsAt
+                resetsAt: limit.resetsAt
             )
         }
 
@@ -255,12 +267,12 @@ struct UsageResponse: Decodable {
         // carries it. Relying on the array alone loses the session exactly when
         // it resets, which is when someone is most likely to be looking.
         func merge(_ window: UsageResponse.Window?, id: String, label: String) {
-            guard let window, let resetsAt = window.resetsAt,
+            guard let window,
                   !windows.contains(where: { $0.id == id })
             else { return }
             windows.append(LimitWindow(id: id, label: label,
                                        usedFraction: window.utilization / 100,
-                                       resetsAt: resetsAt))
+                                       resetsAt: window.resetsAt))
         }
         merge(fiveHour, id: "session", label: "Current session")
         merge(sevenDay, id: "weekly_all", label: "All models")

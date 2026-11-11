@@ -62,14 +62,15 @@ final class UsageResponseTests: XCTestCase {
         XCTAssertEqual(try decode(reversed).limitWindows().map(\.id), ["session", "weekly_all"])
     }
 
-    /// A window with no reset time is not a window we can render a countdown
-    /// for, so it is dropped rather than shown with a bogus date.
-    func testDropsWindowsWithoutAResetTime() throws {
+    func testKeepsActualPercentagesWithoutInventingResetTimes() throws {
         let json = """
-        { "limits": [ { "kind": "session", "percent": 5, "resets_at": null } ],
-          "five_hour": { "utilization": 5.0, "resets_at": null } }
+        { "limits": [ { "kind": "weekly_all", "percent": 17, "resets_at": null } ],
+          "five_hour": { "utilization": 0.0, "resets_at": null } }
         """
-        XCTAssertTrue(try decode(json).limitWindows().isEmpty)
+        let windows = try decode(json).limitWindows()
+        XCTAssertEqual(windows.map(\.id), ["session", "weekly_all"])
+        XCTAssertEqual(windows.map(\.usedFraction), [0, 0.17])
+        XCTAssertTrue(windows.allSatisfy { $0.resetsAt == nil })
     }
 
     /// Older responses without `limits` still render from the named windows.

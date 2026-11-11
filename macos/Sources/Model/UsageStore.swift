@@ -451,6 +451,8 @@ final class UsageStore: ObservableObject {
             return .unsupported(why)
         case UsageProviderError.badResponse(let code):
             return .error("HTTP \(code)")
+        case UsageProviderError.noUsageReading:
+            return .error("Claude did not return a usable reading. Check Claude's Usage settings and try Refresh now.")
         default:
             return .error((error as NSError).localizedDescription)
         }
