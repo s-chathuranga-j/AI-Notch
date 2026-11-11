@@ -1,4 +1,8 @@
 name: AINotch
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 options:
   bundleIdPrefix: com.fourforge
   deploymentTarget:
@@ -8,8 +12,8 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     SWIFT_STRICT_CONCURRENCY: minimal
-    MARKETING_VERSION: "0.3.6"
-    CURRENT_PROJECT_VERSION: "9"
+    MARKETING_VERSION: "0.3.7"
+    CURRENT_PROJECT_VERSION: "10"
     CODE_SIGN_IDENTITY: "-"
     CODE_SIGN_STYLE: Manual
     CODE_SIGNING_REQUIRED: "YES"
@@ -21,6 +25,8 @@ targets:
   AINotch:
     type: application
     platform: macOS
+    dependencies:
+      - package: Sparkle
     sources:
       - path: Sources
       - path: LICENSE
@@ -36,6 +42,13 @@ targets:
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         NSHumanReadableCopyright: "MIT License. See bundled LICENSE and UPSTREAM.md."
+        SUFeedURL: https://raw.githubusercontent.com/s-chathuranga-j/AI-Notch/main/macos/updates/appcast.xml
+        SUPublicEDKey: 5Ec/8qplPa2KYKnugXS8YAAyLpU+SHiaS6covoZnPsw=
+        SUEnableAutomaticChecks: true
+        SUAllowsAutomaticUpdates: false
+        SUEnableSystemProfiling: false
+        SUShowReleaseNotes: false
+        SUVerifyUpdateBeforeExtraction: true
     settings:
       base:
         PRODUCT_NAME: AI Notch

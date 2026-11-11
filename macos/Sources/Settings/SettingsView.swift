@@ -120,7 +120,14 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("Version \(updater.currentVersion). Local preview build. Automatic updates are not configured.")
+                Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
+                HStack {
+                    Text("Version \(updater.currentVersion)")
+                    Spacer()
+                    Button("Check for Updates…", action: updater.checkForUpdates)
+                        .disabled(!updater.canCheckForUpdates)
+                }
+                Text("Checks daily for new versions. You choose when to download and install an update.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

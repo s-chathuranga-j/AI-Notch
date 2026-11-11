@@ -40,7 +40,7 @@ Claude Code's macOS login is a Keychain item. Routine AI Notch refreshes read it
 
 Disabling an account cancels its active usage task, prevents queued requests, discards late results, clears its archived readings and credential cache, and stops/clears session monitoring. A request that has already reached the provider cannot be recalled. Other enabled accounts keep operating.
 
-Direct provider HTTP requests use exact destination checks, reject redirects, and have no persistent response, cookie or credential store. No raw usage responses, tokens or subprocess output are written to app logs. There is no AI Notch telemetry service or embedded browser. Previous OS diagnostic logs are not retroactively erased; the app clears its old HTTP response cache at launch.
+Direct provider HTTP requests use exact destination checks, reject redirects, and have no persistent response, cookie or credential store. No raw usage responses, tokens or subprocess output are written to app logs. There is no AI Notch telemetry service or embedded browser. Update checks contact GitHub for the appcast and release downloads; Sparkle system profiling and embedded release notes are disabled. Previous OS diagnostic logs are not retroactively erased; the app clears its old HTTP response cache at launch.
 
 Usage history (percentages, reset windows and fetch times) is stored locally in app preferences while the account is enabled. Account credentials remain owned by the installed coding tools. The app does not implement cloud synchronization; system backups and vendor-tool network behavior are outside AI Notch's control.
 
@@ -78,8 +78,22 @@ The ring shows the first limited quota (premium requests, or AI credits on credi
 
 ## Independent build
 
-AI Notch uses bundle ID `com.fourforge.ainotch` and separate preferences. The original publisher's update service and signing configuration are removed. This preview is ad-hoc signed for local use, with no automatic updates. Public distribution will require your own Developer ID signing and notarization.
+AI Notch uses bundle ID `com.fourforge.ainotch` and separate preferences. The original publisher’s update service and signing configuration are removed. Sparkle checks this repository’s macOS update feed daily and prompts before downloading and installing. Settings includes an automatic-check toggle and **Check for Updates…**. Demo mode does not start the updater. This preview is ad-hoc signed for local use. Public distribution will require your own Developer ID signing and notarization.
 
 ## License
 
 See `LICENSE` and `UPSTREAM.md` for the required open-source notices. Both are included in the app bundle.
+
+## Publishing macOS updates
+
+Existing versions without Sparkle need one manual install of the first updater-enabled release. After that, users can install subsequent releases from the update prompt.
+
+1. Increase both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml`, and add the release notes. Sparkle compares the build number (`CURRENT_PROJECT_VERSION`), so it must increase for every published update.
+2. Run `make test` and `make package`. Packaging builds a universal Apple Silicon/Intel app, verifies the app and disk image, signs the update archive, and creates `build/releases/appcast.xml`. It fails if the signing key does not match the public key embedded in the app.
+3. Upload the generated universal `.dmg` and `.dmg.sha256` to the GitHub release tagged `macos-v<VERSION>`. Verify the download is available before updating the feed. Do not overwrite an already published version with different binaries.
+4. Copy `build/releases/appcast.xml` to `updates/appcast.xml`, then commit and push the feed to `main`. The app reads that exact path on GitHub. Only publish a feed after its matching installer is uploaded. The initial empty feed deliberately offers no updates.
+5. Test from an older installed build: check, download, install, and relaunch. Confirm preferences remain intact. The feed intentionally contains only the newest full installer; delta updates are not generated.
+
+The Sparkle Ed25519 private key lives in the release Mac’s login Keychain under account `com.fourforge.ainotch`; only its public key is in the repository. Preserve a secure backup of this key before distributing the first updater-enabled release. On a replacement release Mac, restore the same key using Sparkle’s `generate_keys` tool; generating a different key breaks updates for existing installations. The tools are in `build/SourcePackages/artifacts/sparkle/Sparkle/bin/` after building.
+
+Archive signatures protect update integrity; they do not replace Apple Developer ID signing or notarization. Those require an Apple Developer account and are still needed for public distribution without Gatekeeper warnings. See [Sparkle’s distribution documentation](https://sparkle-project.org/documentation/).

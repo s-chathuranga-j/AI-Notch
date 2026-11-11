@@ -27,7 +27,7 @@ clean:
 .PHONY: release package
 
 release: gen
-	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)' -derivedDataPath $(BUILD) -configuration Release build
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -destination '$(DEST)' -derivedDataPath $(BUILD) -configuration Release ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO build
 
 package: release
 	python3 Scripts/package-release.py

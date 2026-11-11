@@ -75,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // right-hand one and then crossfades away from it.
             controller.model.edge = preferences.notchEdge
 
-            let updater = Updater()
+            let updater = Updater(startingUpdater: !isDemo)
             self.updater = updater
 
             let settings = SettingsWindowController(

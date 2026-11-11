@@ -24,5 +24,19 @@
 	<string>26.0</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License. See bundled LICENSE and UPSTREAM.md.</string>
+	<key>SUAllowsAutomaticUpdates</key>
+	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/s-chathuranga-j/AI-Notch/main/macos/updates/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>5Ec/8qplPa2KYKnugXS8YAAyLpU+SHiaS6covoZnPsw=</string>
+	<key>SUShowReleaseNotes</key>
+	<false/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>
