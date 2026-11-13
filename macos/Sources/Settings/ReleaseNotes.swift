@@ -30,6 +30,9 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.9", headline: "Recover from an expired Claude Code login.", changes: [
+            .init(title: "Expired login guidance", detail: "When Claude Code’s saved login expires, the usage tooltip explains how to sign in again and refresh AI Notch. The last reading remains marked as stale.")
+        ]),
         ReleaseNote(version: "0.3.8", headline: "Know when usage is out of date.", changes: [
             .init(title: "Clear stale usage", detail: "The notch shows Stale instead of an old percentage and filled ring. The tooltip dates the last reading and identifies it as historical."),
             .init(title: "Keychain access guidance", detail: "When macOS refuses credential access, the notch shows Access and the tooltip points to Settings → Allow access. Fresh percentages return after a successful refresh.")

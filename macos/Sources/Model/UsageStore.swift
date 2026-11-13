@@ -392,6 +392,16 @@ final class UsageStore: ObservableObject {
             return empty
         }
 
+        if case UsageProviderError.credentialExpired = error,
+           let claude = provider as? ClaudeOAuthProvider {
+            var snapshot = lastGood[provider.id]?.snapshot ?? Self.placeholder(provider)
+            snapshot.status = .stale(
+                since: lastGood[provider.id]?.fetchedAt ?? .distantPast,
+                reason: "Claude Code sign-in expired. Run \(claude.profile.signInCommand) in Terminal and use /login if prompted, then refresh AI Notch."
+            )
+            return snapshot
+        }
+
         guard let previous = lastGood[provider.id] else {
             var empty = Self.placeholder(provider)
             empty.status = status

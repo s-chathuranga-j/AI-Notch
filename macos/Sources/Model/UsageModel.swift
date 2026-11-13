@@ -13,7 +13,7 @@ enum Fidelity: String, Codable, Equatable {
 
 enum ProviderStatus: Equatable {
     case ok
-    case stale(since: Date)
+    case stale(since: Date, reason: String? = nil)
     case needsAuth
     /// macOS was asked for a credential that exists, and refused.
     case accessDenied
@@ -23,7 +23,7 @@ enum ProviderStatus: Equatable {
     var isStale: Bool { if case .stale = self { return true }; return false }
 
     /// When the reading behind this status was actually taken.
-    var staleSince: Date? { if case .stale(let since) = self { return since }; return nil }
+    var staleSince: Date? { if case .stale(let since, _) = self { return since }; return nil }
 }
 
 /// One metered window a provider exposes — Claude has two (the rolling session
@@ -206,6 +206,9 @@ struct ProviderSnapshot: Identifiable, Equatable {
         if needsCredentialAccess || status == .accessDenied {
             return "Keychain access needed. Open AI Notch Settings → \(displayName) → Allow access…"
                 + lastReadingMessage
+        }
+        if case .stale(_, let reason?) = status {
+            return reason + lastReadingMessage
         }
         if status.isStale && hasReading {
             return "Usage is stale. Current usage is unknown." + lastReadingMessage

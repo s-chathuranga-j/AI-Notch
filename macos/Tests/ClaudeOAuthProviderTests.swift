@@ -124,6 +124,29 @@ final class ClaudeOAuthProviderTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testExpiredClaudeLoginExplainsHowToRecoverAndKeepsHistory() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ClaudeExpiryTests.\(UUID())"))
+        let archive = UsageArchive(defaults: defaults)
+        let provider = ClaudeOAuthProvider(session: StubEndpoint.session(), archive: archive) {
+            ClaudeCredentials(accessToken: "expired", expiresAt: .distantPast, subscriptionType: "max")
+        }
+        let reading = ProviderSnapshot(id: provider.id, displayName: "Claude", glyph: .claude,
+                                       fidelity: .official, status: .ok,
+                                       windows: [LimitWindow(id: "session", label: "Session", usedFraction: 1)])
+        let fetchedAt = Date(timeIntervalSinceReferenceDate: 1000)
+        archive.save([provider.id: (reading, fetchedAt)])
+        let store = UsageStore(providers: [provider], archive: archive)
+
+        await store.refresh()
+
+        let snapshot = try XCTUnwrap(store.snapshots.first)
+        XCTAssertEqual(snapshot.status.staleSince, fetchedAt)
+        XCTAssertNil(snapshot.ringFraction)
+        XCTAssertTrue(snapshot.statusMessage?.contains("Claude Code sign-in expired") == true)
+        XCTAssertTrue(snapshot.statusMessage?.contains("Last reading: 100%") == true)
+    }
+
     private static let usagePayload = Data("""
     {"limits":[{"kind":"session","percent":42,"resets_at":"2099-01-01T00:00:00Z"}]}
     """.utf8)
