@@ -213,7 +213,7 @@ final class NotchWindowController {
         guard model.snapshots.indices.contains(index) else { return nil }
         let snapshot = model.snapshots[index]
         let cardHeight = NotchLayout.cardHeight(
-            windowCount: snapshot.windows.count,
+            windowCount: snapshot.statusMessage == nil ? snapshot.windows.count : 0,
             sessionCount: model.activity(for: snapshot.id)?.sessions.count ?? 0,
             sessionCap: model.sessionCap,
             statusMessage: snapshot.statusMessage,

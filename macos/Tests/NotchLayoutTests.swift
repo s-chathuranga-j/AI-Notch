@@ -914,7 +914,7 @@ final class StatusMessageHeightTests: XCTestCase {
                                        status: .accessDenied, windows: [])
         let message = try! XCTUnwrap(refused.statusMessage)
         XCTAssertGreaterThan(NotchLayout.bodyTextHeight(message),
-                             2 * NotchLayout.cardBodyLineHeight,
+                             NotchLayout.cardBodyLineHeight,
                              "the message that motivated this now fits on one line")
         XCTAssertGreaterThan(
             NotchLayout.cardHeight(windowCount: 0, statusMessage: message),

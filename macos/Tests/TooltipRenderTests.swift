@@ -9,6 +9,30 @@ import SwiftUI
 /// `TOOLTIP_RENDER_PATH` and the frame is written there.
 @MainActor
 final class TooltipRenderTests: XCTestCase {
+    func testStaleAccessTooltipAndCell() throws {
+        let now = Date()
+        let snapshot = ProviderSnapshot(
+            id: "claude", displayName: "Claude", glyph: .claude,
+            fidelity: .official, status: .stale(since: now.addingTimeInterval(-86400)),
+            windows: [LimitWindow(id: "session", label: "Session", usedFraction: 1)],
+            needsCredentialAccess: true
+        )
+        let height = NotchLayout.cardHeight(windowCount: 0,
+                                            statusMessage: snapshot.statusMessage)
+        XCTAssertLessThanOrEqual(height, NotchLayout.defaultMaxCardHeight)
+        let view = HStack(spacing: 20) {
+            TooltipCard(snapshot: snapshot, now: now)
+            ProviderCell(snapshot: snapshot)
+        }.padding(20).background(Color.black)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 3
+        let image = try XCTUnwrap(renderer.nsImage)
+        XCTAssertEqual(image.size.height, height + 40, accuracy: 1)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: try XCTUnwrap(image.tiffRepresentation)))
+        let png = try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        try png.write(to: URL(fileURLWithPath: "/tmp/ainotch-stale-preview.png"))
+    }
+
     private func session(_ name: String, _ state: AgentSession.State,
                          minutes: Int) -> AgentSession {
         AgentSession(id: name, name: name, detail: "Terminal · usage-notch",

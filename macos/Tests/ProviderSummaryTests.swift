@@ -22,19 +22,12 @@ final class ProviderSummaryTests: XCTestCase {
         XCTAssertTrue(store.providerSummaries.first?.wasRefusedAccess ?? false)
     }
 
-    /// The case the first attempt at this got wrong.
-    ///
-    /// With a good reading already in hand, `supersedesHistory` keeps the old
-    /// snapshot *and its status* through a refusal — on purpose, because the
-    /// number is still true. Anything reading the refusal off the snapshot sees
-    /// `.ok` and shows nothing, which is exactly what happened on screen.
     func testARefusalReachesTheRowEvenWithAGoodReadingInHand() async {
         let provider = SwitchableProvider(outcome: .success)
         let store = makeStore(provider)
 
         await store.refresh()
         XCTAssertFalse(store.providerSummaries.first?.wasRefusedAccess ?? true)
-        // The snapshot deliberately keeps saying the reading is fine.
         provider.outcome = .failure(.accessDenied)
 
         await store.refresh()
@@ -43,6 +36,22 @@ final class ProviderSummaryTests: XCTestCase {
                           "the remembered reading should have survived the refusal")
         XCTAssertTrue(store.providerSummaries.first?.wasRefusedAccess ?? false,
                       "the row could not tell it had been refused")
+        let snapshot = store.snapshots.first!
+        XCTAssertTrue(snapshot.status.isStale)
+        XCTAssertTrue(snapshot.needsCredentialAccess)
+        XCTAssertEqual(snapshot.headlineText, "Access")
+        XCTAssertNil(snapshot.ringFraction)
+        XCTAssertEqual(snapshot.usedFraction, 0.42)
+        XCTAssertTrue(snapshot.statusMessage!.contains("Keychain access needed"))
+        XCTAssertTrue(snapshot.statusMessage!.contains("Last reading: 42%"))
+
+        provider.outcome = .success
+        await store.refresh()
+        let fresh = store.snapshots.first!
+        XCTAssertEqual(fresh.headlineText, "42%")
+        XCTAssertEqual(fresh.ringFraction, 0.42)
+        XCTAssertFalse(fresh.needsCredentialAccess)
+        XCTAssertNil(fresh.statusMessage)
     }
 
     /// And it clears as soon as macOS lets us back in, so the remedy stops being

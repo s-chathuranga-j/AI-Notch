@@ -162,7 +162,7 @@ struct ProviderCell: View {
 
     /// A dash, not "0%": nothing read is not the same as nothing used.
     private var percentText: String {
-        snapshot.hasReading ? snapshot.headlineText : "—"
+        snapshot.headlineText
     }
 
     var body: some View {
@@ -188,5 +188,7 @@ struct ProviderCell: View {
                 .animation(NotchMotion.reading, value: percentText)
         }
         .frame(height: NotchLayout.cellExtent)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(snapshot.displayName): \(snapshot.statusMessage ?? percentText)")
     }
 }

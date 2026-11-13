@@ -136,6 +136,8 @@ struct ProviderSnapshot: Identifiable, Equatable {
     /// Set when something is blocked right now. Deliberately separate from the
     /// windows: it is not a measurement, it is a door being shut.
     var block: UsageBlock?
+    /// A refresh was refused, independently of the age of the saved reading.
+    var needsCredentialAccess = false
 
     /// The number on the cell: the provider's declared primary window — for
     /// Claude, the current session.
@@ -157,6 +159,8 @@ struct ProviderSnapshot: Identifiable, Equatable {
 
     /// What the cell prints under the ring.
     var headlineText: String {
+        if needsCredentialAccess || status == .accessDenied { return "Access" }
+        if status.isStale { return "Stale" }
         if let usedFraction { return "\(Int((usedFraction * 100).rounded()))%" }
         if headline?.isUnlimited == true { return "∞" }
         if let remaining = headline?.remaining { return "\(remaining)" }
@@ -169,7 +173,9 @@ struct ProviderSnapshot: Identifiable, Equatable {
     var hasReading: Bool { !windows.isEmpty }
 
     /// A ring can only be drawn when the provider said what the limit was.
-    var ringFraction: Double? { usedFraction }
+    var ringFraction: Double? {
+        status.isStale || needsCredentialAccess || status == .accessDenied ? nil : usedFraction
+    }
 
     /// Signing in means something different per provider, so the prompt has to
     /// say which door to knock on.
@@ -190,16 +196,24 @@ struct ProviderSnapshot: Identifiable, Equatable {
         }
     }
 
-    /// What the tooltip says instead of limit rows when there is nothing to show.
+    private var lastReadingMessage: String {
+        guard let headline else { return "" }
+        return "\nLast reading: \(headline.summary). This is not current usage."
+    }
+
+    /// Explains unavailable usage; remembered values are explicitly historical.
     var statusMessage: String? {
+        if needsCredentialAccess || status == .accessDenied {
+            return "Keychain access needed. Open AI Notch Settings → \(displayName) → Allow access…"
+                + lastReadingMessage
+        }
+        if status.isStale && hasReading {
+            return "Usage is stale. Current usage is unknown." + lastReadingMessage
+        }
         if hasReading { return nil }
         switch status {
         case .needsAuth:      return authPrompt
-        case .accessDenied:
-            // Says what happened and what fixes it. "Sign in to Claude Code"
-            // would send someone who *is* signed in to fix the wrong thing.
-            return "AI Notch needs permission to read \(displayName)'s current "
-                 + "login. Open Settings and choose Allow access."
+        case .accessDenied: return nil // Handled above, including remembered readings.
         case .unsupported(let why): return why
         case .error(let why): return "Couldn't read usage — \(why)"
         case .stale, .ok:     return "Waiting for the first reading…"

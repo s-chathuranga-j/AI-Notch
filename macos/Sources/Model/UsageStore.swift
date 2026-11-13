@@ -372,12 +372,7 @@ final class UsageStore: ObservableObject {
     private func degraded(provider: UsageProvider, error: Error) -> ProviderSnapshot {
         let status = Self.status(for: error)
 
-        // Remembered apart from the snapshot on purpose. The snapshot answers
-        // "how good are the numbers I am showing", and for a refusal the honest
-        // answer is "still fine, just ageing" — which is why `supersedesHistory`
-        // keeps the old reading and its status. That deliberately loses the one
-        // fact the settings row needs: whether macOS let us in last time. Two
-        // different questions, so two different places to keep the answer.
+        // Settings also needs the refusal when no historical reading exists.
         if case .accessDenied = status {
             refusedAccess.insert(provider.id)
         } else {
@@ -403,11 +398,12 @@ final class UsageStore: ObservableObject {
             return empty
         }
 
-        // A stale-but-recent reading is still worth showing undimmed; past the
-        // window it gets marked, and the ring dims.
+        // A refusal needs action immediately, even if the saved reading is recent.
         let age = Date().timeIntervalSince(previous.fetchedAt)
         var snapshot = previous.snapshot
-        snapshot.status = age > staleAfter ? .stale(since: previous.fetchedAt) : previous.snapshot.status
+        snapshot.needsCredentialAccess = refusedAccess.contains(provider.id)
+        snapshot.status = age > staleAfter || snapshot.needsCredentialAccess
+            ? .stale(since: previous.fetchedAt) : previous.snapshot.status
         return snapshot
     }
 

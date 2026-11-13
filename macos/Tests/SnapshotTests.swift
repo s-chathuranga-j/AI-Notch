@@ -11,6 +11,25 @@ final class SnapshotTests: XCTestCase {
                          fidelity: fidelity, status: .ok, windows: windows)
     }
 
+    func testStaleFullUsageIsHistoryNotACurrentFullRing() {
+        var stale = snapshot([window("session", 1)])
+        stale.status = .stale(since: Date().addingTimeInterval(-86400))
+        XCTAssertEqual(stale.headlineText, "Stale")
+        XCTAssertNil(stale.ringFraction)
+        XCTAssertEqual(stale.usedFraction, 1)
+        XCTAssertTrue(stale.statusMessage!.contains("Current usage is unknown"))
+        XCTAssertTrue(stale.statusMessage!.contains("Last reading: 100%"))
+    }
+
+    func testAccessDeniedWithoutHistoryHasAnActionInsteadOfAPercentage() {
+        var denied = snapshot([])
+        denied.status = .accessDenied
+        XCTAssertEqual(denied.headlineText, "Access")
+        XCTAssertNil(denied.ringFraction)
+        XCTAssertTrue(denied.statusMessage!.contains("Allow access"))
+        XCTAssertFalse(denied.statusMessage!.contains("Last reading"))
+    }
+
     func testHeadlineIsThePrimaryWindow() {
         let s = snapshot([window("session", 0.73), window("all", 0.07)])
         XCTAssertEqual(s.headline?.id, "session")

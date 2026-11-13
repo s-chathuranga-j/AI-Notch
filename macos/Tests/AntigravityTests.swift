@@ -798,7 +798,7 @@ final class KeychainRefusalTests: XCTestCase {
             fidelity: .official, status: .accessDenied, windows: []
         )
         let message = snapshot.statusMessage ?? ""
-        XCTAssertTrue(message.contains("needs permission"))
+        XCTAssertTrue(message.contains("Keychain access needed"))
         XCTAssertTrue(message.contains("Allow access"))
         XCTAssertFalse(message.contains("Sign in"), "it tells a signed-in user to sign in")
     }

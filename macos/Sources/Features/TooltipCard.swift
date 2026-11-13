@@ -438,7 +438,7 @@ struct TooltipCard: View {
     /// reachable can never drift apart.
     private var height: CGFloat {
         NotchLayout.cardHeight(
-            windowCount: snapshot.windows.count,
+            windowCount: snapshot.statusMessage == nil ? snapshot.windows.count : 0,
             sessionCount: activity?.sessions.count ?? 0,
             sessionCap: sessionCap,
             statusMessage: snapshot.statusMessage,
