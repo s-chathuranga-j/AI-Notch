@@ -3,12 +3,12 @@
     <channel>
         <title>AI Notch</title>
         <item>
-            <title>0.3.7</title>
-            <pubDate>Wed, 11 Nov 2026 19:14:34 +0100</pubDate>
-            <sparkle:version>11</sparkle:version>
-            <sparkle:shortVersionString>0.3.7</sparkle:shortVersionString>
+            <title>0.3.8</title>
+            <pubDate>Fri, 13 Nov 2026 18:43:26 +0100</pubDate>
+            <sparkle:version>12</sparkle:version>
+            <sparkle:shortVersionString>0.3.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/s-chathuranga-j/AI-Notch/releases/download/macos-v0.3.7/AI-Notch-0.3.7-macOS-universal.dmg" length="4689702" type="application/octet-stream" sparkle:edSignature="uQJyANyEU1aLHCFTtCNYp7NCtZoMUjyrVD6r1Bj8Cw4vlYdapCecoNM+WqHxvwybqYM/dMRk+aaqpkhrYEFIDQ=="/>
+            <enclosure url="https://github.com/s-chathuranga-j/AI-Notch/releases/download/macos-v0.3.8/AI-Notch-0.3.8-macOS-universal.dmg" length="4696945" type="application/octet-stream" sparkle:edSignature="jom6zv1zzc4QZetQMgl6NaA6G6XQRHGpAXkvWOzYSF9aXG79RC7a5OU24lIliOsSvmbyfShdvNZsLQxk5/HuAA=="/>
         </item>
     </channel>
 </rss>
