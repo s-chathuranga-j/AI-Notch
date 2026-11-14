@@ -128,7 +128,8 @@ final class UsageStore: ObservableObject {
                             glyph: provider.glyph, account: disconnected.contains(provider.id) ? nil : provider.account(),
                             signIn: provider.signInRoute,
                             wasRefusedAccess: refusedAccess.contains(provider.id),
-                            statusLineCommand: (provider as? ClaudeStatusLineProvider)?.command)
+                            statusLineCommand: (provider as? ClaudeStatusLineProvider)?.command
+                                ?? (provider as? ClaudeOAuthProvider)?.statusLineCommand)
         }
     }
 

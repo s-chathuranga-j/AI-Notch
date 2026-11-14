@@ -143,9 +143,9 @@ final class ClaudeKeychain: @unchecked Sendable {
     /// Reads whatever is stored, expired or not. Judging expiry is the caller's
     /// job, because "signed out" and "the token has aged out overnight" call for
     /// different behaviour and only one of them is worth alarming anyone about.
-    func load(allowingInteraction: Bool = false) throws -> ClaudeCredentials {
+    func load(allowingInteraction: Bool = false, forceReload: Bool = false) throws -> ClaudeCredentials {
         try KeychainItem.withInteraction(allowed: allowingInteraction) {
-            if allowingInteraction { cache.forget() }
+            if forceReload { cache.forget() }
             return try cache.value(
                 itemModifiedAt: { KeychainItem.modifiedAt(service: service) },
                 reload: { try ClaudeCredentials.read(service: service) }

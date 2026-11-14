@@ -21,6 +21,10 @@ actor ClaudeOAuthProvider: UsageProvider {
 
     private let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     private let session: URLSession
+    private let preferStatusLine: Bool
+    nonisolated var statusLineCommand: String? {
+        ClaudeStatusLineProvider(profile: profile).command
+    }
     /// Held between refreshes so the keychain is read once per token, not once
     /// per minute — a keychain read can put a prompt in front of the user.
     /// Set when the endpoint returns 429. Until it passes, refreshes are
@@ -41,13 +45,15 @@ actor ClaudeOAuthProvider: UsageProvider {
     init(profile: ClaudeProfile = .default(),
          session: URLSession = ProviderHTTP.session(),
          archive: UsageArchive = UsageArchive(),
+         preferStatusLine: Bool = false,
          loadCredentials: (@Sendable () throws -> ClaudeCredentials)? = nil) {
         self.profile = profile
         self.id = profile.id
         self.displayName = profile.displayName
         let keychain = ClaudeKeychain(profile: profile)
         self.keychain = keychain
-        self.loadCredentials = loadCredentials ?? { try keychain.load() }
+        self.preferStatusLine = preferStatusLine
+        self.loadCredentials = loadCredentials ?? { try keychain.load(allowingInteraction: preferStatusLine) }
         self.session = session
         self.archive = archive
         // Pick the back-off back up where the last run left it, so relaunching
@@ -60,9 +66,15 @@ actor ClaudeOAuthProvider: UsageProvider {
     }
 
     func fetchSnapshot(allowingCredentialAccess: Bool) async throws -> ProviderSnapshot {
+        if !allowingCredentialAccess, preferStatusLine,
+           let reading = try? await ClaudeStatusLineProvider(profile: profile).fetchSnapshot(),
+           reading.status == .ok {
+            return reading
+        }
+        try Task.checkCancellation()
         if allowingCredentialAccess {
             try Task.checkCancellation()
-            _ = try keychain.load(allowingInteraction: true)
+            _ = try keychain.load(allowingInteraction: true, forceReload: true)
         }
         if let retryNoEarlierThan, retryNoEarlierThan > Date() {
             let remaining = retryNoEarlierThan.timeIntervalSinceNow
@@ -201,6 +213,10 @@ actor ClaudeOAuthProvider: UsageProvider {
         // reach it: plain `claude` signs the default one in, not this.
         .guidance("Run `\(profile.signInCommand)` once — it signs in and refreshes "
                   + "the token this reads. Use /login there to change account.")
+    }
+
+    nonisolated func signOut() async {
+        await ClaudeStatusLineProvider(profile: profile).signOut()
     }
 
     nonisolated func forgetCachedCredential() { keychain.forgetCached() }

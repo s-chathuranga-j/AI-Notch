@@ -36,7 +36,7 @@ Accounts start disabled on the first launch of version 0.2.0, including upgrades
 
 Enabling an account allows local credential/account reads, usage requests and session monitoring where that provider needs them. Live usage sends authentication to the relevant provider over HTTPS. Codex launches its installed app server; Antigravity asks its local language server for quota without reading the rotating Antigravity Keychain item; Copilot runs `gh auth token --hostname github.com` to borrow the GitHub CLI’s login. These tools manage their own backend connections.
 
-Claude Code usage comes from its status line. AI Notch reads the two quota windows from a local file and does not read Claude credentials or send requests to Claude. See [Claude Code usage](#claude-code-usage) for setup.
+AI Notch uses a fresh Claude Code status line reading when available. Otherwise it reads the profile’s Claude Code credential from Keychain and requests usage from Anthropic’s private usage endpoint. macOS may prompt for access when Claude Code rotates the Keychain item. See [Claude Code usage](#claude-code-usage) for setup.
 
 Disabling an account cancels its active usage task, prevents queued requests, discards late results, clears its archived readings and credential cache, and stops/clears session monitoring. A request that has already reached the provider cannot be recalled. Other enabled accounts keep operating.
 

@@ -147,6 +147,33 @@ final class ClaudeOAuthProviderTests: XCTestCase {
         XCTAssertTrue(snapshot.statusMessage?.contains("Last reading: 100%") == true)
     }
 
+    func testStatusLineSkipsDirectRefreshUntilTheReadingIsStale() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let profile = ClaudeProfile(slug: "test", configDirectory: directory)
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ClaudeFallbackTests.\(UUID())"))
+        let provider = ClaudeOAuthProvider(profile: profile, session: StubEndpoint.session(),
+                                           archive: UsageArchive(defaults: defaults), preferStatusLine: true) {
+            ClaudeCredentials(accessToken: "fixture", expiresAt: .distantFuture, subscriptionType: "max")
+        }
+        StubEndpoint.reset([.init(status: 200, body: Self.usagePayload)])
+        let collector = ClaudeStatusLineProvider(profile: profile)
+        let reset = Date().addingTimeInterval(3600).timeIntervalSince1970
+        let input = Data("""
+        {"rate_limits":{"five_hour":{"used_percentage":12,"resets_at":\(reset)}}}
+        """.utf8)
+        try collector.save(input: input)
+        let local = try await provider.fetchSnapshot()
+        XCTAssertEqual(local.headlineText, "12%")
+        XCTAssertEqual(StubEndpoint.requestCount, 0)
+
+        try collector.save(input: input, now: Date().addingTimeInterval(-16 * 60))
+        let remote = try await provider.fetchSnapshot()
+        XCTAssertEqual(remote.headlineText, "42%")
+        XCTAssertEqual(StubEndpoint.requestCount, 1)
+    }
+
     private static let usagePayload = Data("""
     {"limits":[{"kind":"session","percent":42,"resets_at":"2099-01-01T00:00:00Z"}]}
     """.utf8)
