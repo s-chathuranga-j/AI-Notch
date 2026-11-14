@@ -656,13 +656,6 @@ final class FirstRunCopyTests: XCTestCase {
                       "nothing warns that the Claude app is not Claude Code")
     }
 
-    /// Routine refreshes must not imply they will interrupt the user; the
-    /// explicit Settings action is how a new Claude item gets approval.
-    func testClaudeKeychainApprovalIsExplained() {
-        let copy = SettingsView.keychainCopy
-        XCTAssertTrue(copy.contains("without opening a password dialog"))
-        XCTAssertTrue(copy.contains("Allow access"))
-    }
 }
 
 /// Antigravity's port changes on every launch, so the bridge failing is a

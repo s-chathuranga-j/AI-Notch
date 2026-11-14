@@ -40,7 +40,7 @@ struct SettingsView: View {
                 // the page.
                 Text(ProcessInfo.processInfo.environment["AINOTCH_DEMO"] == "1"
                      ? "Demo mode · Sample readings only. Quit and reopen AI Notch normally to connect your installed coding tools."
-                     : "AI Notch reads accounts already signed in to your coding tools. Switching a provider off stops account reads, usage requests and activity monitoring, and clears its readings. Requests already sent cannot be recalled. macOS may ask for Keychain access again after a local rebuild.")
+                     : "AI Notch reads accounts already signed in to your coding tools. Switching a provider off stops account reads, usage requests and activity monitoring, and clears its readings. Requests already sent cannot be recalled.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -166,11 +166,6 @@ struct SettingsView: View {
         + "Antigravity or the GitHub CLI (for Copilot), then enable the accounts "
         + "you want here."
 
-    static let keychainCopy =
-        "Claude Code stores its login in Keychain. AI Notch checks it without "
-        + "opening a password dialog. If a new item needs approval, use Allow "
-        + "access in the Claude row. Local rebuilds may need approval again."
-
     private var setupNote: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "sparkles")
@@ -182,12 +177,6 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Text(SettingsView.keychainCopy)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
             }
         }
         .padding(12)
@@ -277,6 +266,22 @@ private struct AccountRow: View {
         if !isConnected {
             Text("Signed out — nothing is read, and no readings are kept.")
                 .foregroundStyle(.tertiary)
+        } else if let command = provider.statusLineCommand {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Add the copied statusLine entry to this profile’s settings.json, then use Claude Code normally. If you already have a status line, call the copied command from your existing script with the same JSON input.")
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Copy status line settings") {
+                        let settings = ["statusLine": ["type": "command", "command": command]]
+                        guard let data = try? JSONSerialization.data(withJSONObject: settings,
+                                                                     options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]),
+                              let text = String(data: data, encoding: .utf8) else { return }
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(text, forType: .string)
+                    }
+                    Link("Claude Code status line", destination: URL(string: "https://code.claude.com/docs/en/statusline#manually-configure-a-status-line")!)
+                }
+            }
         } else if let account = provider.account {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {

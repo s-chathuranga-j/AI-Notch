@@ -1,6 +1,17 @@
 import SwiftUI
 
 @main
+enum AINotchEntryPoint {
+    @MainActor static func main() {
+        let args = CommandLine.arguments
+        if args.dropFirst().first == "--claude-status-line" {
+            if args.count == 3 { ClaudeStatusLineProvider.collect(providerID: args[2]) }
+            return
+        }
+        AINotchMain.main()
+    }
+}
+
 struct AINotchMain: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 

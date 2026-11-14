@@ -36,7 +36,7 @@ Accounts start disabled on the first launch of version 0.2.0, including upgrades
 
 Enabling an account allows local credential/account reads, usage requests and session monitoring where that provider needs them. Live usage sends authentication to the relevant provider over HTTPS. Codex launches its installed app server; Antigravity asks its local language server for quota without reading the rotating Antigravity Keychain item; Copilot runs `gh auth token --hostname github.com` to borrow the GitHub CLI’s login. These tools manage their own backend connections.
 
-Claude Code's macOS login is a Keychain item. Routine AI Notch refreshes read it without allowing a system password dialog. If a new or rotated item needs approval, the last reading remains visible and the Claude row in Settings offers **Allow access…** for one interactive attempt. Choosing Always Allow applies to that item and app identity; a later newly created item or a local rebuild may need separate approval. Copilot uses the GitHub CLI's credential path, not AI Notch's Keychain reader.
+Claude Code usage comes from its status line. AI Notch reads the two quota windows from a local file and does not read Claude credentials or send requests to Claude. See [Claude Code usage](#claude-code-usage) for setup.
 
 Disabling an account cancels its active usage task, prevents queued requests, discards late results, clears its archived readings and credential cache, and stops/clears session monitoring. A request that has already reached the provider cannot be recalled. Other enabled accounts keep operating.
 
@@ -58,11 +58,27 @@ claude
 CLAUDE_CONFIG_DIR=~/.claude-work claude
 ```
 
-Use `/login` inside the relevant Claude Code session if it needs a different account. Do not copy credentials between profiles. Restart AI Notch after creating a profile, then enable `Claude` and `Claude (work)` separately in Settings. Other names such as `~/.claude-personal` are also discovered, provided Claude Code has initialized them. Arbitrary directory locations are not currently discovered. This integration reads Claude Code OAuth subscriptions; API-key or cloud-provider billing is a different integration.
+Use `/login` inside the relevant Claude Code session if it needs a different account. Do not copy credentials between profiles. Restart AI Notch after creating a profile, then enable `Claude` and `Claude (work)` separately in Settings. Other names such as `~/.claude-personal` are also discovered, provided Claude Code has initialized them. Arbitrary directory locations are not currently discovered. The status line integration reads subscription limits for each configured profile.
 
 Cursor, Codex, Antigravity, GLM and Copilot currently expose one account each. Switch accounts in the owning tool to change which one AI Notch reads; simultaneous personal/work rings for these providers are not implemented. GLM uses the first valid credential source in its documented order.
 
 Claude's profile configuration is documented in the [official environment-variable reference](https://code.claude.com/docs/en/env-vars).
+
+## Claude Code usage
+
+1. Enable Claude in AI Notch Settings and click **Copy status line settings**.
+2. Merge the copied `statusLine` entry into `~/.claude/settings.json`. For a work profile, use its own settings file (for example, `~/.claude-work/settings.json`) and copy the command from that profile’s row.
+3. Use Claude Code normally. Its [status line](https://code.claude.com/docs/en/statusline#rate-limit-usage) receives five-hour and weekly usage after the first API response in a session. AI Notch updates on its next refresh and marks old readings stale while Claude Code is idle.
+
+If you already have a status line, keep its settings and add the collector to that script. For a shell script, read stdin once, then pass it independently to the AI Notch command and your existing status line logic. Copy the command for your profile from AI Notch and substitute it for the placeholder below:
+
+```sh
+payload=$(/bin/cat)
+printf '%s' "$payload" | <copied AI Notch command>
+printf '%s' "$payload" | /absolute/path/to/existing-statusline
+```
+
+Only usage percentages, reset times, and the observation time are saved to `ai-notch-usage.json` in the configured profile. Turning the integration off clears its readings and stops the collector from recording. To remove setup entirely, remove the collector command from Claude Code settings. Update the command if you move AI Notch to a different location.
 
 ## GitHub Copilot (experimental)
 

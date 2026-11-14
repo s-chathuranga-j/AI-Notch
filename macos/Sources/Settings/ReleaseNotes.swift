@@ -30,6 +30,9 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.10", headline: "Claude Code usage from your normal sessions.", changes: [
+            .init(title: "Claude Code status line", detail: "Copy the status line settings from your Claude profile in AI Notch. Claude Code sends five-hour and weekly usage during normal sessions. AI Notch reads the figures locally without Keychain approvals or background prompts.")
+        ]),
         ReleaseNote(version: "0.3.9", headline: "Recover from an expired Claude Code login.", changes: [
             .init(title: "Expired login guidance", detail: "When Claude Code’s saved login expires, the usage tooltip explains how to sign in again and refresh AI Notch. The last reading remains marked as stale.")
         ]),

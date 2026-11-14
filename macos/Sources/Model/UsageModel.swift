@@ -138,6 +138,8 @@ struct ProviderSnapshot: Identifiable, Equatable {
     var block: UsageBlock?
     /// A refresh was refused, independently of the age of the saved reading.
     var needsCredentialAccess = false
+    /// When the source measured usage, if separate from when the app read it.
+    var observedAt: Date?
 
     /// The number on the cell: the provider's declared primary window — for
     /// Claude, the current session.

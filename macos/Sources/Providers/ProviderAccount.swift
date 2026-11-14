@@ -133,4 +133,5 @@ struct ProviderSummary: Identifiable, Equatable {
     /// cure for an illness the provider does not have, and a button that does
     /// nothing is indistinguishable from a broken one.
     var wasRefusedAccess: Bool = false
+    var statusLineCommand: String?
 }

@@ -127,7 +127,8 @@ final class UsageStore: ObservableObject {
             ProviderSummary(id: provider.id, name: provider.displayName,
                             glyph: provider.glyph, account: disconnected.contains(provider.id) ? nil : provider.account(),
                             signIn: provider.signInRoute,
-                            wasRefusedAccess: refusedAccess.contains(provider.id))
+                            wasRefusedAccess: refusedAccess.contains(provider.id),
+                            statusLineCommand: (provider as? ClaudeStatusLineProvider)?.command)
         }
     }
 
@@ -356,7 +357,7 @@ final class UsageStore: ObservableObject {
         }
         switch result {
         case .success(let fresh):
-            lastGood[provider.id] = (fresh, Date())
+            lastGood[provider.id] = (fresh, fresh.observedAt ?? Date())
             archive.save(lastGood)
             refusedAccess.remove(provider.id)
             return fresh
@@ -390,6 +391,16 @@ final class UsageStore: ObservableObject {
             var empty = Self.placeholder(provider)
             empty.status = status
             return empty
+        }
+
+        if provider is ClaudeStatusLineProvider {
+            let previous = lastGood[provider.id]
+            var snapshot = previous?.snapshot ?? Self.placeholder(provider)
+            snapshot.status = .stale(
+                since: previous?.fetchedAt ?? .distantPast,
+                reason: "Waiting for Claude Code usage. See the Claude row in AI Notch Settings."
+            )
+            return snapshot
         }
 
         if case UsageProviderError.credentialExpired = error,

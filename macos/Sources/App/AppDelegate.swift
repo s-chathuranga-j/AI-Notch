@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // it drew every provider from the archive and only dropped the
             // switched-off ones once the binding below delivered.
             let store = UsageStore(
-                providers: isDemo ? [] : claudeProfiles.map { ClaudeOAuthProvider(profile: $0) }
+                providers: isDemo ? [] : claudeProfiles.map { ClaudeStatusLineProvider(profile: $0) }
                     + [CursorLocalProvider(), CodexLocalProvider(), AntigravityProvider(),
                        GLMProvider(), CopilotProvider()],
                 disconnected: preferences.disconnectedProviders
