@@ -1,16 +1,16 @@
 # AI Notch for Windows
 
-A tray application with the Mac-style flared black notch and circular usage rings at any screen edge. Hover to reveal rings and percentages, then hover a ring for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.5 release notes](RELEASE-NOTES.md).
+A tray application with the Mac-style flared black notch and circular usage rings at any screen edge. Hover to reveal rings and percentages, then hover a ring for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.6 release notes](RELEASE-NOTES.md).
 
 ## Run on Windows
 
-Download **AI-Notch-0.3.5-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.5) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
+Download **AI-Notch-0.3.6-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.6) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
 
 Quit any existing copy through its tray menu before installing. If you previously used a ZIP, the installed app uses the same saved preferences; your extracted portable folder is left untouched.
 
 Portable ZIPs remain available: extract the complete x64 or ARM64 ZIP into a permanent folder and run **AI Notch.exe**, keeping the supporting files beside it. Windows 10/11 x64 and ARM64 are supported. The installer and app remain unsigned, so Windows may show an unknown-publisher or SmartScreen warning. Native installation testing remains required before treating this as a stable release.
 
-Providers are off by default. Enable Claude or Codex from settings after signing in through their own Windows CLI. Claude reads `%USERPROFILE%\.claude\.credentials.json`; Codex invokes `codex app-server` from PATH with `%USERPROFILE%\.codex` as its configuration directory. This does not read credentials from WSL. Codex is discovered as a native executable on PATH or in the standard npm global vendor-binary locations. Arbitrary shell wrappers are never executed.
+Providers are off by default. Enable Claude or Codex from settings after signing in through their own Windows CLI. Claude reads quota figures from the Claude Code status line; Codex invokes `codex app-server` from PATH with `%USERPROFILE%\.codex` as its configuration directory. This does not read credentials from WSL. Codex is discovered as a native executable on PATH or in the standard npm global vendor-binary locations. Arbitrary shell wrappers are never executed.
 
 For a second Claude subscription, in PowerShell:
 
@@ -20,13 +20,22 @@ claude
 # Run /login and sign in to your work account.
 ```
 
-Restart AI Notch. The work profile appears separately and requires its own enable switch. To return the terminal to the default personal profile, run `Remove-Item Env:CLAUDE_CONFIG_DIR`. Additional `.claude-NAME` folders with credential files are discovered in the same way. Custom paths outside these home-directory profiles and multiple Codex profiles are not yet configurable.
+Restart AI Notch. The work profile appears separately and requires its own enable switch. To return the terminal to the default personal profile, run `Remove-Item Env:CLAUDE_CONFIG_DIR`. Additional initialized `.claude-NAME` folders are discovered in the same way. Custom paths outside these home-directory profiles and multiple Codex profiles are not yet configurable.
 
 Claude reports session and weekly windows for subscription plans. Plans billed on usage credits, including enterprise accounts, report no such windows; those show a single Credits reading taken from the reported spend against the monthly limit, with no reset date. Newer limit kinds are read from the response's `limits` array as Anthropic adds them.
 
 Enable **Start with Windows** in AI Notch Settings to register the installed executable for your Windows user. It reflects the actual Windows startup status and remains off until you enable it. Replace any old Startup-folder shortcut pointing at an extracted ZIP. Upgrades preserve the registration; uninstall removes AI Notch’s own startup entry.
 
-Usage refreshes every two minutes. When a refresh fails, the last reading stays on screen with a warning sign and the reason, rather than disappearing; the account details give the time that reading was taken. An account that has not yet had a successful reading shows the reason alone, never a placeholder number. Expired logins produce an explicit sign-in instruction, not an indefinite waiting indicator. Right-click the tray icon to refresh, show settings, or quit. “Show AI Notch” restores even a deliberately hidden notch. Display changes, resume, and unlock restore placement and refresh enabled accounts. A lost window is recreated and a failed renderer is reloaded. Unexpected JavaScript failures trigger a bounded restart; repeated failures show a visible error instead of a restart loop.
+Usage refreshes every two minutes. The compact ring shows **Stale** when a reading is out of date. Open the account details to see the previous usage figures, their timestamp, and the refresh status. An account awaiting its first reading shows setup guidance. Right-click the tray icon to refresh, show settings, or quit. “Show AI Notch” restores even a deliberately hidden notch. Display changes, resume, and unlock restore placement and refresh enabled accounts. A lost window is recreated and a failed renderer is reloaded. Unexpected JavaScript failures trigger a bounded restart; repeated failures show a visible error instead of a restart loop.
+
+
+## Claude Code usage
+
+1. Enable the Claude profile in AI Notch Settings and click **Copy status line settings**.
+2. Merge the copied `statusLine` entry into `%USERPROFILE%\.claude\settings.json`. For work profiles use their own settings file, such as `%USERPROFILE%\.claude-work\settings.json`.
+3. Use native Windows Claude Code normally and wait for its first response. Click **Refresh** in AI Notch to pick up the reading immediately.
+
+If you already have a status line, keep it and invoke the copied command in your existing script with the same JSON on stdin. The copied command runs Windows PowerShell. AI Notch receives five-hour and weekly usage when those windows are available in the [Claude Code status line](https://code.claude.com/docs/en/statusline#rate-limit-usage). Readings older than 15 minutes are marked stale. The collector saves only quota fields and observation time in the profile's local `ai-notch-usage-windows.json` file while the profile is enabled.
 
 ## Development on a Mac
 
@@ -45,7 +54,7 @@ Implemented: experimental GitHub Copilot quotas, Claude OAuth usage, discovered 
 
 ## Privacy
 
-Account enablement, screen edge, and visibility are saved atomically in Electron's local user-data `settings.json`. Startup registration is kept in Windows settings. Small rotating local `lifecycle.log` and `lifecycle.log.1` files (around 32 KB each) record only timestamps, fixed lifecycle events, and allowlisted error categories. They never include account names, credentials, provider responses, raw exception messages, or stacks, and are never uploaded. Find them under `%APPDATA%\ai-notch-windows` if the app disappears again. Credentials and quota responses stay in memory; neither is logged or saved. The most recent reading for an enabled account is held in memory so a failed refresh can show it as stale, and is discarded when the account is disabled or the app quits. Claude requests go exclusively to `https://api.anthropic.com/api/oauth/usage`, with redirects forbidden. Codex CLI manages its own network access and authentication. Copilot reads `COPILOT_GITHUB_TOKEN` or runs `gh auth token --hostname github.com` locally, then calls only `https://api.github.com/copilot_internal/user`, with redirects forbidden. Tokens remain in the main process and are never passed as command-line arguments or sent to the renderer. Disabling an account cancels its work and rejects late results. The sandboxed renderer has no Node access and cannot make network requests. Narrow IPC exposes only preferences and sanitized usage, never tokens. No analytics, publisher service, updater, browser-cookie extraction, or token refresh is included.
+Account enablement, screen edge, and visibility are saved atomically in Electron's local user-data `settings.json`. Startup registration is kept in Windows settings. Small rotating local `lifecycle.log` and `lifecycle.log.1` files (around 32 KB each) record only timestamps, fixed lifecycle events, and allowlisted error categories. They never include account names, credentials, provider responses, raw exception messages, or stacks, and are never uploaded. Find them under `%APPDATA%\ai-notch-windows` if the app disappears again. Claude Code manages its own login. AI Notch does not access Claude credentials or call its usage endpoint. Disabling the Claude profile removes its saved quota reading. Other provider readings are held in memory and discarded when the provider is disabled or the app quits. Codex CLI manages its own network access and authentication. Copilot reads `COPILOT_GITHUB_TOKEN` or runs `gh auth token --hostname github.com` locally, then calls only `https://api.github.com/copilot_internal/user`, with redirects forbidden. Tokens remain in the main process and are never passed as command-line arguments or sent to the renderer. Disabling an account cancels its work and rejects late results. The sandboxed renderer has no Node access and cannot make network requests. Narrow IPC exposes only preferences and sanitized usage, never tokens. No analytics, publisher service, updater, browser-cookie extraction, or token refresh is included.
 
 The Electron runtime and build tools are additional dependencies compared with the native Mac implementation. Dependency updates should be reviewed before future releases.
 

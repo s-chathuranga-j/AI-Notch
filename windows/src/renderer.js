@@ -9,7 +9,7 @@ function logo(kind){
 function usageRing(account){
  const ring=text('span','','usage-ring');ring.setAttribute('aria-hidden','true');
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 44 44');
- const quota=account.enabled&&account.windows.find(w=>Number.isFinite(w.percent));
+ const quota=account.enabled&&!account.stale&&account.windows.find(w=>Number.isFinite(w.percent));
  const percent=quota?Math.max(0,Math.min(100,quota.percent)):0;
  for(const progress of [false,true]){
   const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
@@ -24,6 +24,7 @@ function updateShape(){
 }
 function usageSummary(account){
  if(!account.enabled)return '—';
+ if(account.stale)return 'Stale';
  const quota=account.windows.find(w=>Number.isFinite(w.percent));
  return quota?Math.round(quota.percent)+'%':account.windows.some(w=>w.unlimited)?'∞':'—';
 }
@@ -54,15 +55,21 @@ function render(state){
   if(state.settings){const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=a.enabled;toggle.setAttribute('aria-label',`Enable ${a.label}`);toggle.onchange=()=>window.notch.toggle(a.id,toggle.checked);title.append(toggle);}
   row.append(title);
   if(a.enabled){
-   for(const w of a.windows){
-    const line=text('div','','meter');line.append(text('span',w.label),text('b',w.unlimited?'Unlimited':`${Math.round(w.percent)}%`));
-    if(!w.unlimited){const progress=document.createElement('progress');progress.setAttribute('aria-label',`${a.label} ${w.label} usage`);progress.max=100;progress.value=Math.max(0,Math.min(100,w.percent));line.append(progress);}
-    row.append(line);if(w.reset)row.append(text('small',`Resets ${new Date(w.reset).toLocaleString()}`));
+   if(state.settings&&!state.demo&&a.kind==='claude'){
+    const copy=text('button','Copy status line settings');copy.type='button';
+    copy.onclick=async()=>{if(await window.notch.copyClaudeStatusLine(a.id))copy.textContent='Copied';};
+    row.append(copy,text('small','Add the copied statusLine entry to this Claude profile’s settings.json. Keep any existing status line by calling the collector from its script.'));
    }
    if(stale){
-    row.append(text('small',`⚠ Not up to date. ${a.status}`,'status stale'));
-    if(a.updated)row.append(text('small',`Showing the last reading, from ${new Date(a.updated).toLocaleTimeString()}.`,'status'));
-   }else row.append(text('small',a.status==='Updated'?`Updated ${new Date(a.updated).toLocaleTimeString()}`:a.status,'status'));
+    row.append(text('small',a.status,'status stale'));
+    if(a.updated)row.append(text('small',`Last reading · ${new Date(a.updated).toLocaleString()}`,'status'));
+   }
+   for(const w of a.windows){
+    const line=text('div','','meter');line.append(text('span',w.label),text('b',w.unlimited?'Unlimited':`${Math.round(w.percent)}%`));
+    if(!w.unlimited&&!stale){const progress=document.createElement('progress');progress.setAttribute('aria-label',`${a.label} ${w.label} usage`);progress.max=100;progress.value=Math.max(0,Math.min(100,w.percent));line.append(progress);}
+    row.append(line);if(w.reset)row.append(text('small',`Resets ${new Date(w.reset).toLocaleString()}`));
+   }
+   if(!stale)row.append(text('small',a.status==='Updated'?`Updated ${new Date(a.updated).toLocaleTimeString()}`:a.status,'status'));
   }else row.append(text('small','Disabled · enable in settings'));
   $('accounts').append(row);
  }

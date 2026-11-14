@@ -1,6 +1,6 @@
-const {app,BrowserWindow,Tray,Menu,ipcMain,screen,session,powerMonitor,dialog}=require('electron');
+const {app,BrowserWindow,Tray,Menu,ipcMain,screen,session,powerMonitor,dialog,clipboard}=require('electron');
 const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');
-const {discover,Poller,fetchUsage}=require('./providers.cjs');
+const {discover,Poller,fetchUsage,claudeStatusLineSettings,claudeReadingFile}=require('./providers.cjs');
 const {notchBounds}=require('./layout.cjs');
 const {record}=require('./diagnostics.cjs');
 const demo=process.platform!=='win32'||process.argv.includes('--demo');
@@ -118,7 +118,14 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   createWindow();
   function valid(event){return win&&!win.isDestroyed()&&event.sender===win.webContents&&event.senderFrame===win.webContents.mainFrame;}
   ipcMain.handle('state',event=>valid(event)?state():null);
-  ipcMain.handle('toggle',async(event,id,on)=>{if(!valid(event)||typeof on!=='boolean')return;const a=accounts.find(a=>a.id===id);if(!a)return;if(on){poller.enabled.add(id);rows[id]={status:'Loading…',windows:[]};}else poller.disable(id);config.enabled=[...poller.enabled];await save();push();if(on)await poller.refresh(a);});
+  ipcMain.handle('toggle',async(event,id,on)=>{if(!valid(event)||typeof on!=='boolean')return;const a=accounts.find(a=>a.id===id);if(!a)return;if(on){poller.enabled.add(id);rows[id]={status:'Loading…',windows:[]};}else poller.disable(id);config.enabled=[...poller.enabled];await save();if(!on&&!demo&&a.kind==='claude')await fs.rm(path.join(a.dir,claudeReadingFile),{force:true}).catch(()=>{});push();if(on)await poller.refresh(a);});
+  ipcMain.handle('claude-status-line', (event,id) => {
+   if(!valid(event)||demo)return false;
+   const account=accounts.find(a=>a.id===id&&a.kind==='claude');
+   if(!account)return false;
+   clipboard.writeText(claudeStatusLineSettings(account,path.join(app.getPath('userData'),'settings.json')));
+   return true;
+  });
   ipcMain.handle('retry',event=>{if(valid(event))return refresh();});
   ipcMain.handle('position',async(event,value)=>{if(valid(event)&&['top','bottom','left','right'].includes(value)){config.position=value;await save();place();push();}});
   ipcMain.handle('visibility',async(event,value)=>{if(valid(event)&&VISIBILITIES.includes(value)){config.visibility=value;expanded=value==='always';detailId=null;await save();place();push();}});

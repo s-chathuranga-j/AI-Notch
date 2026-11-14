@@ -1,8 +1,49 @@
-const {test}=require('node:test');const assert=require('node:assert/strict');const {parseClaude}=require('../src/providers.cjs');
-test('the limits array is read and labelled, newest kinds included',()=>{const windows=parseClaude({limits:[{kind:'weekly_opus',percent:12,resets_at:'2026-09-10T00:00:00Z'},{kind:'session',percent:37,resets_at:'2026-09-08T23:00:00Z'},{kind:'weekly_all',percent:21,resets_at:null},{kind:'weekly_haiku',percent:4,resets_at:null}]});assert.deepEqual(windows.map(w=>w.label),['Session','Weekly','Haiku','Opus']);assert.equal(windows[0].percent,37);assert.equal(windows[0].reset,'2026-09-08T23:00:00Z');});
-test('a named window survives leaving the limits array at its reset',()=>{const windows=parseClaude({limits:[{kind:'weekly_all',percent:21,resets_at:null}],five_hour:{utilization:3,resets_at:'2026-09-09T04:00:00Z'}});assert.deepEqual(windows.map(w=>w.label),['Session','Weekly']);assert.equal(windows[0].percent,3);});
-test('limits win over the duplicate named window rather than doubling it',()=>{const windows=parseClaude({limits:[{kind:'session',percent:50,resets_at:null}],five_hour:{utilization:99,resets_at:null}});assert.deepEqual(windows,[{label:'Session',percent:50,reset:null}]);});
-test('credit-billed plans report spend when no rate-limit window exists',()=>{const windows=parseClaude({five_hour:null,seven_day:null,limits:[],extra_usage:{is_enabled:true,utilization:35.78},spend:{percent:36,enabled:true}});assert.deepEqual(windows,[{label:'Credits',percent:35.78,reset:null}]);});
-test('spend stands in when extra usage is absent, and disabled credits are not a reading',()=>{assert.deepEqual(parseClaude({limits:[],spend:{percent:36,enabled:true}}),[{label:'Credits',percent:36,reset:null}]);assert.deepEqual(parseClaude({limits:[],extra_usage:{is_enabled:false,utilization:35.78},spend:{enabled:false,percent:36}}),[]);});
-test('credits never displace a rate-limit window in the summary position',()=>{const windows=parseClaude({five_hour:{utilization:8,resets_at:null},extra_usage:{is_enabled:true,utilization:99}});assert.deepEqual(windows.map(w=>w.label),['Session','Credits']);});
-test('an all-null response is still no reading, never an invented zero',()=>{assert.deepEqual(parseClaude({five_hour:null,seven_day:null,limits:[],tangelo:null,nimbus_quill:{utilization:0}}),[]);});
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs/promises');
+const os=require('node:os');
+const path=require('node:path');
+const {claudeStatusLineSettings,claudeReadingFile,fetchUsage,Poller}=require('../src/providers.cjs');
+
+test('Claude polls local usage and keeps the original timestamp when it goes stale',async t=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'ainotch-claude-'));
+  t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const account={id:'claude-work',kind:'claude',dir};
+  const file=path.join(dir,claudeReadingFile);
+  let row;
+  const poller=new Poller(fetchUsage,(_id,value)=>{row=value;});
+  poller.enabled.add(account.id);
+  await poller.refresh(account);
+  assert.match(row.status,/copy the Claude status line/);
+
+  const observedAt=Date.now()-1000;
+  const reset=Math.floor(observedAt/1000)+3600;
+  const reading={observedAt,five_hour:{used_percentage:0,resets_at:reset},seven_day:{used_percentage:55.5,resets_at:reset}};
+  await fs.writeFile(file,JSON.stringify(reading));
+  await poller.refresh(account);
+  assert.equal(row.updated,observedAt);
+  assert.deepEqual(row.windows.map(w=>w.percent),[0,55.5]);
+  assert.equal(row.stale,undefined);
+
+  reading.observedAt-=16*60*1000;
+  await fs.writeFile(file,JSON.stringify(reading));
+  await poller.refresh(account);
+  assert.equal(row.stale,true);
+  assert.equal(row.updated,reading.observedAt);
+
+  reading.observedAt=Date.now()-1000;
+  reading.five_hour.resets_at=reading.observedAt/1000+0.5;
+  await fs.writeFile(file,JSON.stringify(reading));
+  await poller.refresh(account);
+  assert.deepEqual(row.windows.map(w=>w.label),['Weekly']);
+});
+
+test('Claude setup quotes profile paths and passes PowerShell a shell-safe argument',()=>{
+  const dir="C:/Users/O'Neil/.claude-work";
+  const data=JSON.parse(claudeStatusLineSettings({id:'claude-work',dir},'C:/AI Notch/settings.json'));
+  const encoded=data.statusLine.command.match(/^powershell\.exe -NoProfile -NonInteractive -EncodedCommand ([A-Za-z0-9+/=]+)$/)[1];
+  const script=Buffer.from(encoded,'base64').toString('utf16le');
+  assert.ok(script.includes("$settingsPath = 'C:/AI Notch/settings.json'"));
+  assert.ok(script.includes("$readingPath = 'C:/Users/O''Neil/.claude-work/ai-notch-usage-windows.json'"));
+  assert.ok(script.includes("$profileId = 'claude-work'"));
+});

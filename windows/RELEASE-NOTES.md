@@ -1,4 +1,15 @@
-# AI Notch for Windows v0.3.5 — Preview
+# AI Notch for Windows v0.3.6 — Preview
+
+AI Notch now receives Claude’s five-hour and weekly usage from normal Claude Code sessions through its status line. The collector saves quota figures locally without reading Claude credentials or sending background requests.
+
+- In AI Notch Settings, enable your Claude profile and choose **Copy status line settings**. Merge the entry into that profile’s Claude Code settings, then use Claude Code normally. See the [setup guide](https://github.com/s-chathuranga-j/AI-Notch/blob/main/windows/README.md#claude-code-usage) if you already use a status line.
+- An old usage reading displays **Stale** with an empty ring. The details show the previous figures and their timestamp.
+
+The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs are also available. This is an unsigned preview.
+
+All 48 tests passed. Live Claude Code usage and installer execution on Windows remain unverified.
+
+## Earlier release: Windows v0.3.5
 
 The Windows notch now uses the Mac's flared outline and 44-pixel circular usage rings on all four screen edges.
 
