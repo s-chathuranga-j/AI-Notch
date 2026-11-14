@@ -5,11 +5,11 @@ try {
     $limits = ($input | Out-String | ConvertFrom-Json).rate_limits
     $now = [DateTimeOffset]::UtcNow
     $reading = @{ observedAt = $now.ToUnixTimeMilliseconds() }
-    foreach ($key in @('five_hour', 'seven_day')) {
+    foreach ($key in @('five_hour', 'seven_day', 'spend_limit')) {
         $window = $limits.$key
         $used = $window.used_percentage
         $reset = $window.resets_at
-        if (($used -is [ValueType]) -and ($used -isnot [bool]) -and $used -ge 0 -and $used -le 100 -and
+        if (($used -is [ValueType]) -and ($used -isnot [bool]) -and $used -ge 0 -and $used -le [double]::MaxValue -and ($key -eq 'spend_limit' -or $used -le 100) -and
             ($reset -is [ValueType]) -and ($reset -isnot [bool]) -and $reset -gt $now.ToUnixTimeSeconds() -and $reset -le 8640000000000) {
             $reading[$key] = @{ used_percentage = $used; resets_at = $reset }
         }

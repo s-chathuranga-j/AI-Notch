@@ -1,10 +1,10 @@
 # AI Notch for Windows
 
-A tray application with the Mac-style flared black notch and circular usage rings at any screen edge. Hover to reveal rings and percentages, then hover a ring for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.6 release notes](RELEASE-NOTES.md).
+A tray application with the Mac-style flared black notch and circular usage rings at any screen edge. Hover to reveal rings and percentages, then hover a ring for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.7 release notes](RELEASE-NOTES.md).
 
 ## Run on Windows
 
-Download **AI-Notch-0.3.6-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.6) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
+Download **AI-Notch-0.3.7-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.7) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
 
 Quit any existing copy through its tray menu before installing. If you previously used a ZIP, the installed app uses the same saved preferences; your extracted portable folder is left untouched.
 
@@ -22,7 +22,7 @@ claude
 
 Restart AI Notch. The work profile appears separately and requires its own enable switch. To return the terminal to the default personal profile, run `Remove-Item Env:CLAUDE_CONFIG_DIR`. Additional initialized `.claude-NAME` folders are discovered in the same way. Custom paths outside these home-directory profiles and multiple Codex profiles are not yet configurable.
 
-Claude reports session and weekly windows for subscription plans. Plans billed on usage credits, including enterprise accounts, report no such windows; those show a single Credits reading taken from the reported spend against the monthly limit, with no reset date. Newer limit kinds are read from the response's `limits` array as Anthropic adds them.
+AI Notch shows Claude’s session, weekly, and spend limits when Claude Code sends them to the status line. Accounts that don’t expose their credit usage there can check [Claude Settings → Usage](https://claude.ai/settings/usage).
 
 Enable **Start with Windows** in AI Notch Settings to register the installed executable for your Windows user. It reflects the actual Windows startup status and remains off until you enable it. Replace any old Startup-folder shortcut pointing at an extracted ZIP. Upgrades preserve the registration; uninstall removes AI Notch’s own startup entry.
 
@@ -35,7 +35,7 @@ Usage refreshes every two minutes. The compact ring shows **Stale** when a readi
 2. Merge the copied `statusLine` entry into `%USERPROFILE%\.claude\settings.json`. For work profiles use their own settings file, such as `%USERPROFILE%\.claude-work\settings.json`.
 3. Use native Windows Claude Code normally and wait for its first response. Click **Refresh** in AI Notch to pick up the reading immediately.
 
-If you already have a status line, keep it and invoke the copied command in your existing script with the same JSON on stdin. The copied command runs Windows PowerShell. AI Notch receives five-hour and weekly usage when those windows are available in the [Claude Code status line](https://code.claude.com/docs/en/statusline#rate-limit-usage). Readings older than 15 minutes are marked stale. The collector saves only quota fields and observation time in the profile's local `ai-notch-usage-windows.json` file while the profile is enabled.
+If you already have a status line, keep it and invoke the copied command in your existing script with the same JSON on stdin. The copied command runs Windows PowerShell. AI Notch receives five-hour, weekly, and gateway spend limits when available in the [Claude Code status line](https://code.claude.com/docs/en/statusline#rate-limit-usage). If you configured the status line with an older Windows build, copy the settings again and replace the old AI Notch command to collect spend limits. Readings older than 15 minutes are marked stale. The collector saves only quota fields and observation time in the profile's local `ai-notch-usage-windows.json` file while the profile is enabled.
 
 ## Development on a Mac
 

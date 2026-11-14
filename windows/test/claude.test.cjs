@@ -46,4 +46,29 @@ test('Claude setup quotes profile paths and passes PowerShell a shell-safe argum
   assert.ok(script.includes("$settingsPath = 'C:/AI Notch/settings.json'"));
   assert.ok(script.includes("$readingPath = 'C:/Users/O''Neil/.claude-work/ai-notch-usage-windows.json'"));
   assert.ok(script.includes("$profileId = 'claude-work'"));
+  assert.ok(script.includes("@('five_hour', 'seven_day', 'spend_limit')"));
+});
+
+test('Claude shows a spend-only reading, including zero, overages, and expired limits',async t=>{
+  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'ainotch-spend-'));
+  t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+  const account={id:'claude-work',kind:'claude',dir};
+  const signal=new AbortController().signal;
+  const observedAt=Date.now()-2000;
+  const resets_at=Math.floor(observedAt/1000)+3600;
+  const reading={observedAt,spend_limit:{used_percentage:0,resets_at}};
+  const file=path.join(dir,claudeReadingFile);
+
+  await fs.writeFile(file,JSON.stringify(reading));
+  const fresh=await fetchUsage(account,signal);
+  assert.deepEqual(fresh.windows,[{label:'Spend limit',percent:0,reset:new Date(resets_at*1000).toISOString()}]);
+  assert.equal(fresh.updated,observedAt);
+
+  reading.spend_limit.used_percentage=125;
+  await fs.writeFile(file,JSON.stringify(reading));
+  assert.equal((await fetchUsage(account,signal)).windows[0].percent,125);
+
+  reading.spend_limit.resets_at=Math.floor(observedAt/1000)+1;
+  await fs.writeFile(file,JSON.stringify(reading));
+  assert.equal((await fetchUsage(account,signal)).stale,true);
 });

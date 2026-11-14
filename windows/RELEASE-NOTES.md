@@ -1,4 +1,14 @@
-# AI Notch for Windows v0.3.6 — Preview
+# AI Notch for Windows v0.3.7 — Preview
+
+AI Notch now shows **Spend limit** when Claude Code reports it through the status line, including accounts with no five-hour or weekly reading.
+
+After updating, choose **Copy status line settings** in your Claude profile row and replace the old AI Notch command in Claude Code's settings. The updated command collects spend-limit data when Claude Code provides it. Accounts that do not expose spend limits can check [Claude Settings → Usage](https://claude.ai/settings/usage).
+
+The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs and SHA-256 checksums are included. This is an unsigned preview.
+
+All 49 tests passed. Live usage with a Windows Enterprise account and native installer execution remain unverified.
+
+## Earlier release: Windows v0.3.6
 
 AI Notch now receives Claude’s five-hour and weekly usage from normal Claude Code sessions through its status line. The collector saves quota figures locally without reading Claude credentials or sending background requests.
 

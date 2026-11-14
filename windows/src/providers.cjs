@@ -4,7 +4,7 @@ const path = require('node:path');
 const {spawn} = require('node:child_process');
 const syncFS = require('node:fs');
 const claudeReadingFile = 'ai-notch-usage-windows.json';
-const claudeSetup = 'In AI Notch Settings, copy the Claude status line settings, then use Claude Code normally.';
+const claudeSetup = 'In AI Notch Settings, copy the Claude status line settings, then use Claude Code normally. If no usage appears after a response, check Claude\'s Usage page. Your account may not report limits to the status line.';
 
 function claudeStatusLineSettings(account, settingsPath) {
   const quote = value => "'" + value.replace(/'/g, "''") + "'";
@@ -38,11 +38,11 @@ async function claude(account, signal) {
   const updated = reading?.observedAt;
   if (!Number.isFinite(updated) || updated <= 0 || updated > now) throw new Error(claudeSetup);
 
-  const windows = [['five_hour','Session'],['seven_day','Weekly']].flatMap(([key,label]) => {
+  const windows = [['five_hour','Session'],['seven_day','Weekly'],['spend_limit','Spend limit']].flatMap(([key,label]) => {
     const entry = reading[key];
     const percent = entry?.used_percentage;
     const reset = new Date(typeof entry?.resets_at === 'number' ? entry.resets_at * 1000 : NaN);
-    if (!Number.isFinite(percent) || percent < 0 || percent > 100 || !(reset.getTime() > updated)) return [];
+    if (!Number.isFinite(percent) || percent < 0 || (key !== 'spend_limit' && percent > 100) || !(reset.getTime() > updated)) return [];
     return [{label, percent, reset:reset.toISOString()}];
   });
   if (!windows.length) throw new Error(claudeSetup);
