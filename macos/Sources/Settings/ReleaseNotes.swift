@@ -30,6 +30,10 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.12", headline: "Clearer update recovery.", changes: [
+            .init(title: "Restart before updating a replaced app", detail: "AI Notch checks its running code identity before starting an update. If the app was replaced while open, it asks you to quit and reopen it before trying again."),
+            .init(title: "Simpler update wording", detail: "The update message uses separate sentences for the available and installed versions.")
+        ]),
         ReleaseNote(version: "0.3.11", headline: "Claude usage refreshes when the status line goes stale.", changes: [
             .init(title: "Keychain refresh", detail: "When a fresh Claude Code status line reading is unavailable, AI Notch fetches usage with your saved Claude Code login. macOS may ask for Keychain access.")
         ]),

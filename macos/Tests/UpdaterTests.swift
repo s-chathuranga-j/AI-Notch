@@ -1,4 +1,6 @@
 import XCTest
+import Sparkle
+import AppKit
 @testable import AINotch
 
 @MainActor
@@ -8,6 +10,25 @@ final class UpdaterTests: XCTestCase {
         XCTAssertFalse(updater.canCheckForUpdates)
         updater.checkForUpdates()
         XCTAssertFalse(updater.canCheckForUpdates)
+    }
+
+    func testUpdateWindowUsesSentencesWhenItBecomesKey() {
+        let updater = Updater()
+        let window = NSWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        window.identifier = NSUserInterfaceItemIdentifier("SUUpdateAlert")
+        let label = NSTextField(labelWithString: "AI Notch 0.3.12 is now available—you have 0.3.11.")
+        window.contentView?.addSubview(label)
+        withExtendedLifetime(updater) {
+            NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
+            XCTAssertEqual(label.stringValue, "AI Notch 0.3.12 is now available. You have 0.3.11.")
+        }
+        XCTAssertEqual(Updater.updateMessage("Ready to install"), "Ready to install")
+    }
+
+    func testSignedRunningAppCanCheckForUpdates() throws {
+        let controller = SPUStandardUpdaterController(startingUpdater: false,
+                                                      updaterDelegate: nil, userDriverDelegate: nil)
+        try Updater().updater(controller.updater, mayPerform: .updates)
     }
 
     func testShippedUpdateConfiguration() throws {
