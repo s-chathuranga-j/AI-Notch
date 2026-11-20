@@ -94,7 +94,7 @@ function alignDetail(){
  const row=[...$('accounts').children].find(r=>r.dataset.account===selected);
  const chip=[...$('compact').children].find(c=>c.dataset.account===selected);
  if(!side||current?.settings||!row?.getBoundingClientRect||!chip?.firstChild?.getBoundingClientRect){content.style.paddingTop='';return;}
- const edge=48,box=content.getBoundingClientRect(),rowBox=row.getBoundingClientRect(),ring=chip.firstChild.getBoundingClientRect();
+ const edge=14,box=content.getBoundingClientRect(),rowBox=row.getBoundingClientRect(),ring=chip.firstChild.getBoundingClientRect();
  if(!rowBox.height)return;
  const padding=parseFloat(getComputedStyle(content).paddingTop)||0;
  const above=rowBox.top-box.top-padding; // the heading, which travels with the card
