@@ -171,6 +171,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 readings.map { $0.applying(preferences.ringChoice(for: $0.id)) }
             }
             let guide = { Double(UsageAlertTracker.clean(preferences.usageAlertThresholds).first ?? 90) }
+            // The chart's guide follows the lowest alert level, so a change of
+            // levels redraws it without waiting for the next reading.
+            preferences.$usageAlertThresholds
+                .dropFirst()
+                .receive(on: RunLoop.main)
+                .sink { [weak controller] _ in
+                    controller?.model.insights = watch.insights(
+                        for: pointRings(watch.lastReadings), guidePercent: guide()
+                    )
+                }
+                .store(in: &cancellables)
+
             preferences.$ringChoices
                 .dropFirst()
                 .receive(on: RunLoop.main)
@@ -209,8 +221,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // Alerts off silences everything, notifications included.
                     // Neither that nor quiet hours tells the tracker, so a limit
                     // still high afterwards is announced then, not lost.
+                    // A batch queued before a provider was switched off must not
+                    // put it back into the history that was just cleared.
                     let notices = watch.receive(
-                        shown, record: !isDemo,
+                        shown.filter { !preferences.disconnectedProviders.contains($0.id) },
+                        record: !isDemo,
                         judge: preferences.usageAlertsEnabled
                             && !preferences.quietHours.contains(now),
                         thresholds: preferences.usageAlertThresholds,

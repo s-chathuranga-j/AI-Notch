@@ -12,8 +12,9 @@ enum RingChoice: Equatable, Hashable {
     /// Whichever window is closest to its limit right now. This one *does*
     /// change subject, which is the point of choosing it.
     case closest
-    /// A named window. If the provider stops reporting it, the ring falls back
-    /// to the provider's headline rather than going blank.
+    /// A named window. If the provider stops reporting it, or reports it
+    /// without a percentage, the ring falls back to the provider's headline
+    /// rather than going blank.
     case window(String)
 
     init(rawValue: String?) {
@@ -47,7 +48,11 @@ extension ProviderSnapshot {
                 copy.headlineID = top.id
             }
         case .window(let id):
-            if windows.contains(where: { $0.id == id }) { copy.headlineID = id }
+            // Only a window with a reading: one reported without a percentage
+            // would draw an empty ring, so it falls back as a missing one does.
+            if windows.contains(where: { $0.id == id && $0.usedFraction != nil }) {
+                copy.headlineID = id
+            }
         }
         return copy
     }

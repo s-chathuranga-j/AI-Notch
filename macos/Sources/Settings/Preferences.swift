@@ -275,6 +275,9 @@ final class Preferences: ObservableObject {
     /// It has to be something the user asks for.
     static func eraseAllData() {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.fourforge.ainotch"
+        // Before anything is deleted: the save on quit would otherwise write
+        // history.json straight back.
+        UsageHistoryFile.isDisabled = true
         UserDefaults.standard.removePersistentDomain(forName: bundleID)
         UserDefaults.standard.synchronize()
 

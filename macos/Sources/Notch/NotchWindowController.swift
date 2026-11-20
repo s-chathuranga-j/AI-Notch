@@ -545,15 +545,25 @@ final class NotchWindowController {
                             warnings: Set<String> = []) {
         let carried = model.isAlerting ? model.noticeIDs : []
         model.noticeIDs = carried.subtracting(warnings).union(notices)
-        guard visibility != .alwaysShow else { return }
         alertWork?.cancel()
+        // Always show is already open, so nothing moves — but it still enters
+        // the timed alert state, which is what tints a reset ring green and
+        // what clears that tint again when the time is up.
+        guard visibility != .alwaysShow else {
+            model.isAlerting = true
+            scheduleAlertEnd(after: duration)
+            return
+        }
         foldWork?.cancel()
         foldWork = nil
         model.isAlerting = true
         if visibility == .hidden { panel?.orderFrontRegardless() }
         withAnimation(NotchMotion.unfold) { model.isExpanded = true }
         updateInteractiveRects()
+        scheduleAlertEnd(after: duration)
+    }
 
+    private func scheduleAlertEnd(after duration: TimeInterval) {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated { self?.endUsageAlert() }
         }

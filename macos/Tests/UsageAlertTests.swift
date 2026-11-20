@@ -136,6 +136,18 @@ final class UsageAlertTests: XCTestCase {
                                    paceAlerts: false, forecasts: forecasts, now: now), [])
     }
 
+    func testWhenSeveralWindowsCrossTheMostSeriousIsNamed() {
+        var tracker = UsageAlertTracker()
+        let notices = tracker.notices(for: [snapshot("claude", session: 0.92, weekly: 1.0)],
+                                      thresholds: [90, 100], paceAlerts: false, forecasts: [:])
+        XCTAssertEqual(notices.map(\.label), ["Weekly"])
+
+        var tied = UsageAlertTracker()
+        let same = tied.notices(for: [snapshot("claude", session: 0.97, weekly: 0.93)],
+                                paceAlerts: false, forecasts: [:])
+        XCTAssertEqual(same.map(\.label), ["Session"], "same level: the more used one")
+    }
+
     func testThresholdsAreCleaned() {
         XCTAssertEqual(UsageAlertTracker.clean([100, 75, 42]), [75, 100])
         XCTAssertEqual(UsageAlertTracker.clean([]), [90])

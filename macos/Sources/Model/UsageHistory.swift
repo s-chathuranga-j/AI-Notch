@@ -274,6 +274,10 @@ struct ProviderInsights: Equatable {
 struct UsageHistoryFile {
     let url: URL
 
+    /// Set by "erase all data" before the app quits, so the save on the way out
+    /// cannot write back the history that was just deleted.
+    nonisolated(unsafe) static var isDisabled = false
+
     static var standard: UsageHistoryFile? {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.fourforge.ainotch"
         guard let support = FileManager.default.urls(for: .applicationSupportDirectory,
@@ -291,6 +295,7 @@ struct UsageHistoryFile {
     }
 
     func save(_ history: UsageHistory) {
+        guard !Self.isDisabled else { return }
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)

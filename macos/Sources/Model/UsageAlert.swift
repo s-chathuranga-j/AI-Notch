@@ -260,8 +260,10 @@ extension UsageAlertTracker {
     /// What a round of readings is worth saying, one notice per provider at
     /// most: a crossed limit beats a pace warning, which beats a reset.
     ///
-    /// Fed on every reading, alerts on or off, so switching them on later does
-    /// not announce a limit that was crossed long ago.
+    /// Called only while alerts may speak. While they are muted — switched off,
+    /// or quiet hours — the caller feeds `update(_:thresholds:silent:)` instead,
+    /// so the state still follows the readings down without announcing anything,
+    /// and a limit that climbed during the mute is announced when it ends.
     mutating func notices(for snapshots: [ProviderSnapshot],
                           thresholds: Set<Int> = defaultThresholds,
                           paceAlerts: Bool,
@@ -271,7 +273,12 @@ extension UsageAlertTracker {
         var notices: [UsageNotice] = []
         for snapshot in snapshots {
             let name = snapshot.displayName
-            if let crossing = result.crossed.last(where: { $0.providerID == snapshot.id }) {
+            // Several windows can cross in one reading: name the most serious,
+            // the highest level and then the most used.
+            let crossing = result.crossed
+                .filter { $0.providerID == snapshot.id }
+                .max { ($0.threshold, $0.usedFraction) < ($1.threshold, $1.usedFraction) }
+            if let crossing {
                 notices.append(UsageNotice(providerID: snapshot.id, displayName: name,
                                            kind: .limit, label: crossing.label,
                                            usedFraction: crossing.usedFraction))

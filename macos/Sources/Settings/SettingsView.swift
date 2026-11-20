@@ -377,6 +377,8 @@ private struct AccountRow: View {
                 let choice = preferences.ringChoice(for: provider.id)
                 if case .window(let id) = choice,
                    !provider.windows.contains(where: { $0.id == id }) { return .provider }
+                // `provider.windows` lists only windows with a reading, so this
+                // matches `ProviderSnapshot.applying(_:)`.
                 return choice
             },
             set: { preferences.setRingChoice($0, for: provider.id) }

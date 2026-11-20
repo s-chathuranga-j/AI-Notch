@@ -26,6 +26,11 @@ final class RingChoiceTests: XCTestCase {
                        "a window that disappeared must not blank the ring")
     }
 
+    func testANamedWindowWithoutAReadingFallsBack() {
+        XCTAssertEqual(snapshot.applying(.window("credits")).headline?.id, "session",
+                       "a window with no percentage would draw an empty ring")
+    }
+
     func testChoicesRoundTripThroughTheirStoredForm() {
         for choice in [RingChoice.provider, .closest, .window("weekly")] {
             XCTAssertEqual(RingChoice(rawValue: choice.rawValue), choice)
