@@ -143,7 +143,9 @@ final class ClaudeOAuthProviderTests: XCTestCase {
         let snapshot = try XCTUnwrap(store.snapshots.first)
         XCTAssertEqual(snapshot.status.staleSince, fetchedAt)
         XCTAssertNil(snapshot.ringFraction)
-        XCTAssertTrue(snapshot.statusMessage?.contains("Claude Code sign-in expired") == true)
+        XCTAssertTrue(snapshot.statusMessage?.contains("token has expired") == true)
+        XCTAssertTrue(snapshot.statusMessage?.contains("next time you use Claude Code") == true)
+        XCTAssertFalse(snapshot.statusMessage?.contains("/login") == true)
         XCTAssertTrue(snapshot.statusMessage?.contains("Last reading: 100%") == true)
     }
 

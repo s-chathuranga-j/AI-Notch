@@ -68,6 +68,8 @@ final class UsageStore: ObservableObject {
     private var isRefreshing = false
     private var wakeObserver: NSObjectProtocol?
     private var generations: [String: UInt64] = [:]
+    /// The last `changeStamp` seen per provider, so a change is noticed once.
+    private var changeStamps: [String: Date] = [:]
     private var providerTasks: [String: Task<ProviderSnapshot, Error>] = [:]
 
     /// Invalidates even cancellation-unaware results and any held credentials.
@@ -168,6 +170,7 @@ final class UsageStore: ObservableObject {
 
     /// Decides whether this tick is worth a request at all.
     private func tick() {
+        refreshChangedSources()
         let waited = lastAttempt.map { Date().timeIntervalSince($0) } ?? .greatestFiniteMagnitude
         guard Self.shouldRefresh(
             isBusy: isBusy(),
@@ -175,6 +178,26 @@ final class UsageStore: ObservableObject {
             idleInterval: idleRefreshInterval
         ) else { return }
         refreshNow()
+    }
+
+    /// Refresh, out of turn, any provider whose source has just changed — for
+    /// Claude, the moment Claude Code renews its token or writes a reading,
+    /// rather than up to five idle minutes later.
+    private func refreshChangedSources() {
+        for provider in providers where !disconnected.contains(provider.id) {
+            guard let signalling = provider as? ChangeSignalling,
+                  let stamp = signalling.changeStamp() else { continue }
+            let previous = changeStamps[provider.id]
+            changeStamps[provider.id] = stamp
+            if Self.sourceChanged(previous: previous, current: stamp) {
+                refresh(providerID: provider.id)
+            }
+        }
+    }
+
+    /// The first stamp only sets the baseline: the launch refresh already read it.
+    nonisolated static func sourceChanged(previous: Date?, current: Date) -> Bool {
+        previous.map { current > $0 } ?? false
     }
 
     /// Poll at full rate while something is running; otherwise wait out the
@@ -407,12 +430,23 @@ final class UsageStore: ObservableObject {
             return snapshot
         }
 
-        if case UsageProviderError.credentialExpired = error,
-           let claude = provider as? ClaudeOAuthProvider {
+        if case UsageProviderError.credentialExpired = error, provider is ClaudeOAuthProvider {
             var snapshot = lastGood[provider.id]?.snapshot ?? Self.placeholder(provider)
             snapshot.status = .stale(
                 since: lastGood[provider.id]?.fetchedAt ?? .distantPast,
-                reason: "Claude Code sign-in expired. Run \(claude.profile.signInCommand) in Terminal and use /login if prompted, then refresh AI Notch."
+                reason: Self.expiredTokenReason
+            )
+            return snapshot
+        }
+
+        // A recent reading stays as it is; the reason matters once it has aged.
+        if case UsageProviderError.rateLimited(let retryAfter) = error,
+           lastGood[provider.id].map({ Date().timeIntervalSince($0.fetchedAt) > staleAfter }) ?? true {
+            var snapshot = lastGood[provider.id]?.snapshot ?? Self.placeholder(provider)
+            snapshot.status = .stale(
+                since: lastGood[provider.id]?.fetchedAt ?? .distantPast,
+                reason: Self.rateLimitedReason(provider: provider.displayName,
+                                               retryAt: Date().addingTimeInterval(retryAfter))
             )
             return snapshot
         }
@@ -443,6 +477,18 @@ final class UsageStore: ObservableObject {
         case .accessDenied:            return false
         case .ok, .stale, .error:      return false
         }
+    }
+
+    /// Why an expired Claude token leaves the ring stale. Not "signed out":
+    /// the token is short-lived and Claude Code renews it on its own.
+    nonisolated static let expiredTokenReason = "Claude Code’s sign-in token has expired. It renews by itself the next time you use Claude Code, and AI Notch updates within a minute — no password needed."
+
+    /// Why a rate-limited provider is stale, and when the next try is.
+    nonisolated static func rateLimitedReason(provider: String, retryAt: Date,
+                                  calendar: Calendar = .current) -> String {
+        let formatter = ResetCopy.formatter(for: calendar)
+        formatter.dateFormat = "h:mm a"
+        return "\(provider) is limiting how often usage can be read. Trying again at \(formatter.string(from: retryAt))."
     }
 
     /// Exposed for the tests: the store never invents a reading, so what a

@@ -45,6 +45,15 @@ protocol UsageProvider {
     func fetchSnapshot(allowingCredentialAccess: Bool) async throws -> ProviderSnapshot
 }
 
+/// A provider that can say, cheaply and without prompting, that something it
+/// reads from has changed — so the store can refresh it at once instead of on
+/// the next idle poll.
+protocol ChangeSignalling {
+    /// Any date that moves when the source moves; nil when unknown. Must never
+    /// read a secret or raise a dialogue: it is asked once a minute.
+    func changeStamp() -> Date?
+}
+
 enum UsageProviderError: Error {
     /// No usable credential — the user has to sign in again.
     case needsAuth
