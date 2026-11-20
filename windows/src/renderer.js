@@ -6,10 +6,40 @@ function logo(kind){
  img.src=`assets/${kind==='claude'?'claude':kind==='copilot'?'copilot':'openai'}.svg`;
  img.className='provider-logo';img.alt=kind==='claude'?'Claude':kind==='copilot'?'GitHub Copilot':'OpenAI';return img;
 }
+// Which window the ring and its number show: the account's choice, or the first with a percentage.
+function ringWindow(a){
+ const finite=(a.windows||[]).filter(w=>Number.isFinite(w.percent));
+ if(a.ring==='highest')return finite.reduce((m,w)=>!m||w.percent>m.percent?w:m,null);
+ return finite.find(w=>w.label===a.ring)||finite[0]||null;
+}
+function clock(t){return new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});}
+function forecastLine(f){
+ const when=f.eta-Date.now()<60000?'any minute now':'around '+clock(f.eta);
+ const tail=f.beforeReset===true?', before it resets':f.beforeReset===false?', after it resets':'';
+ return text('small',`At this pace: runs out ${when}${tail}`,f.beforeReset===true?'forecast soon':'forecast');
+}
+// Seven bars, one per day, each the highest reading that day. Days with no reading stay empty.
+function historyChart(peaks,days,label){
+ const ns='http://www.w3.org/2000/svg',w=280,h=44,bw=26,gap=(w-7*bw)/6;
+ const box=text('div','','history');
+ const known=peaks.filter(p=>p!==null);
+ const head=text('div','','history-head');head.append(text('span',`${label} peak · 7 days`),text('span',`avg ${Math.round(known.reduce((a,b)=>a+b,0)/known.length)}%`));
+ const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${w} ${h+13}`);svg.setAttribute('role','img');
+ svg.setAttribute('aria-label',`${label} daily peaks: `+peaks.map((p,i)=>`${new Date(days[i]).toLocaleDateString([],{weekday:'short'})} ${p===null?'no data':Math.round(p)+'%'}`).join(', '));
+ const line=document.createElementNS(ns,'line');for(const [k,v] of Object.entries({x1:0,x2:w,y1:h-h*.9,y2:h-h*.9,class:'history-line'}))line.setAttribute(k,String(v));svg.append(line);
+ peaks.forEach((p,i)=>{
+  const x=i*(bw+gap);
+  if(p!==null){const r=document.createElementNS(ns,'rect'),bh=Math.max(2,h*Math.min(100,p)/100),level=levelFor(p);
+   for(const [k,v] of Object.entries({x,y:h-bh,width:bw,height:bh,rx:3,class:'history-bar'+(level?' level-'+level:'')+(i===6?' today':'')}))r.setAttribute(k,String(v));svg.append(r);}
+  const t=document.createElementNS(ns,'text');for(const [k,v] of Object.entries({x:x+bw/2,y:h+11,'text-anchor':'middle',class:'history-day'}))t.setAttribute(k,String(v));
+  t.textContent=new Date(days[i]).toLocaleDateString([],{weekday:'narrow'});svg.append(t);
+ });
+ box.append(head,svg);return box;
+}
 function usageRing(account){
  const ring=text('span','','usage-ring');ring.setAttribute('aria-hidden','true');
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 44 44');
- const quota=account.enabled&&!account.stale&&account.windows.find(w=>Number.isFinite(w.percent));
+ const quota=account.enabled&&!account.stale&&ringWindow(account);
  const percent=quota?Math.max(0,Math.min(100,quota.percent)):0;
  for(const progress of [false,true]){
   const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
@@ -26,7 +56,7 @@ function levelFor(percent){return Number.isFinite(percent)?percent>=100?'critica
 function usageSummary(account){
  if(!account.enabled)return '—';
  if(account.stale)return 'Stale';
- const quota=account.windows.find(w=>Number.isFinite(w.percent));
+ const quota=ringWindow(account);
  return quota?Math.round(quota.percent)+'%':account.windows.some(w=>w.unlimited)?'∞':'—';
 }
 function render(state){
@@ -39,14 +69,25 @@ function render(state){
  $('settings').setAttribute('aria-expanded',String(state.settings));
  document.body.classList.toggle('settings',state.settings);document.body.classList.toggle('alerting',!!state.alerting);
  $('preferences').hidden=!state.settings;$('position').value=state.position;$('visibility').value=state.visibility||'onHover';
- $('alerts').checked=state.alerts!==false;$('alert-seconds').value=String(state.alertSeconds||10);$('alert-seconds').disabled=state.alerts===false;
+ $('alerts').checked=state.alerts!==false;$('alert-seconds').value=String(state.alertSeconds||10);
+ const thresholds=state.alertThresholds||[90];
+ for(const id of ['t75','t90','t100']){$(id).checked=thresholds.includes(Number($(id).value));$(id).disabled=state.alerts===false;}
+ $('pace').checked=state.paceAlerts!==false;
+ const quiet=state.quiet||{};$('quiet').checked=!!quiet.enabled;$('quiet-start').value=quiet.start||'22:00';$('quiet-end').value=quiet.end||'08:00';
+ $('quiet-start').disabled=$('quiet-end').disabled=!quiet.enabled;
+ $('notifications').checked=!!state.systemNotifications;$('notifications').disabled=!state.notificationsAvailable;
+ for(const id of ['pace','alert-seconds'])$(id).disabled=state.alerts===false;
+ $('shortcut').value=state.peekShortcut||'off';$('shortcut-status').textContent=state.shortcutError||(state.peekShortcut&&state.peekShortcut!=='off'?'Shows the notch for a few seconds from anywhere.':'');
+ const display=$('display');if(display.replaceChildren){display.replaceChildren();const main=document.createElement('option');main.value='primary';main.textContent='Main display';display.append(main);
+  for(const d of state.displays||[]){if((state.displays||[]).length<2)break;const o=document.createElement('option');o.value=d.id;o.textContent=d.label;display.append(o);}}
+ display.value=state.display||'primary';display.disabled=(state.displays||[]).length<2;
  $('startup').checked=!!state.startWithWindows;$('startup').disabled=!state.startupAvailable;
  $('startup-status').textContent=state.startupError||(state.startupAvailable?'':'Available in the installed Windows app.');
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
  $('accounts').replaceChildren();$('compact').replaceChildren();
  for(const a of state.accounts){
   const stale=!!a.stale&&a.enabled&&a.windows.length>0;
-  const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}${stale?' stale':''}${a.level?' level-'+a.level:''}`);chip.type='button';
+  const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}${stale?' stale':''}${a.level?' level-'+a.level:''}${a.notice?' notice-'+a.notice:''}`);chip.type='button';
   chip.setAttribute('aria-label',`${a.label}: ${usageSummary(a)}. ${a.enabled?(stale?`${a.status} Showing the last reading.`:a.status):'Disabled'}`);
   chip.setAttribute('aria-controls','accounts');chip.dataset.account=a.id;chip.dataset.provider=a.kind;
   chip.onmouseenter=()=>showDetail(a.id);chip.onfocus=()=>showDetail(a.id);chip.onclick=()=>showDetail(a.id);
@@ -56,6 +97,11 @@ function render(state){
   const row=text('article','',stale?'stale':undefined);row.dataset.account=a.id;row.dataset.provider=a.kind;
   const title=text('div','','title');const identity=text('div','','account-identity');
   identity.append(logo(a.kind),text('strong',a.label));title.append(identity);
+  if(state.settings&&a.enabled&&a.windows.filter(w=>Number.isFinite(w.percent)).length>1){
+   const pick=document.createElement('select');pick.className='ring-pick';pick.setAttribute('aria-label',`${a.label}: ring shows`);
+   for(const [value,name] of [['auto','Ring: first limit'],['highest','Ring: closest to limit'],...a.windows.filter(w=>Number.isFinite(w.percent)).map(w=>[w.label,'Ring: '+w.label])]){const o=document.createElement('option');o.value=value;o.textContent=name;pick.append(o);}
+   pick.value=a.ring||'auto';pick.onchange=()=>window.notch.ring(a.id,pick.value);title.append(pick);
+  }
   if(state.settings){const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=a.enabled;toggle.setAttribute('aria-label',`Enable ${a.label}`);toggle.onchange=()=>window.notch.toggle(a.id,toggle.checked);title.append(toggle);}
   row.append(title);
   if(a.enabled){
@@ -72,7 +118,10 @@ function render(state){
     const level=stale?null:levelFor(w.percent);const line=text('div','',level?'meter level-'+level:'meter');line.append(text('span',w.label),text('b',w.unlimited?'Unlimited':`${Math.round(w.percent)}%`));
     if(!w.unlimited&&!stale){const progress=document.createElement('progress');progress.setAttribute('aria-label',`${a.label} ${w.label} usage`);progress.max=100;progress.value=Math.max(0,Math.min(100,w.percent));line.append(progress);}
     row.append(line);if(w.reset)row.append(text('small',`Resets ${new Date(w.reset).toLocaleString()}`));
+    if(!stale&&a.forecasts?.[w.label])row.append(forecastLine(a.forecasts[w.label]));
    }
+   const ringed=ringWindow(a);
+   if(!stale&&!state.settings&&ringed&&a.history?.[ringed.label]&&state.historyDays)row.append(historyChart(a.history[ringed.label],state.historyDays,ringed.label));
    if(!stale)row.append(text('small',a.status==='Updated'?`Updated ${new Date(a.updated).toLocaleTimeString()}`:a.status,'status'));
   }else row.append(text('small','Disabled · enable in settings'));
   $('accounts').append(row);
@@ -113,6 +162,14 @@ $('retry').onclick=()=>window.notch.retry();
 $('position').onchange=e=>window.notch.position(e.target.value);
 $('visibility').onchange=e=>window.notch.visibility(e.target.value);
 $('alerts').onchange=e=>window.notch.alerts({enabled:e.target.checked});
+for(const id of ['t75','t90','t100'])$(id).onchange=()=>window.notch.alerts({thresholds:['t75','t90','t100'].filter(t=>$(t).checked).map(t=>Number($(t).value))});
+$('pace').onchange=e=>window.notch.alerts({pace:e.target.checked});
+$('quiet').onchange=e=>window.notch.alerts({quiet:{enabled:e.target.checked}});
+$('quiet-start').onchange=e=>window.notch.alerts({quiet:{start:e.target.value}});
+$('quiet-end').onchange=e=>window.notch.alerts({quiet:{end:e.target.value}});
+$('notifications').onchange=e=>window.notch.alerts({notifications:e.target.checked});
+$('shortcut').onchange=e=>window.notch.shortcut(e.target.value);
+$('display').onchange=e=>window.notch.display(e.target.value);
 $('alert-seconds').onchange=e=>window.notch.alerts({seconds:Number(e.target.value)});
 $('startup').onchange=e=>window.notch.startup(e.target.checked).catch(()=>{$('startup-status').textContent='Windows could not change startup settings. Try again.';});
 document.body.onmouseenter=expand;

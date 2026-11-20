@@ -9,10 +9,10 @@ function setup(){
   replaceChildren(){this.children=[];}
   setAttribute(key,value){this.attributes[key]=value;}
  }
- const ids=Object.fromEntries(['settings','preferences','position','visibility','alerts','alert-seconds','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
+ const ids=Object.fromEntries(['settings','preferences','position','visibility','alerts','alert-seconds','t75','t90','t100','pace','quiet','quiet-start','quiet-end','notifications','shortcut','shortcut-status','display','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
  const body=new Element();const calls=[];let callback;let delayed;
  const state={settings:false,expanded:false,position:'left',demo:true,accounts:['claude','codex'].map(id=>({id,kind:id,label:id,enabled:true,status:'Updated',windows:[{label:'Session',percent:25}],updated:Date.now()}))};
- const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){},alerts:value=>calls.push(['alerts',value]),startup:on=>{calls.push(['startup',on]);return Promise.resolve();}};
+ const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){},alerts:value=>calls.push(['alerts',value]),shortcut:value=>calls.push(['shortcut',value]),display:value=>calls.push(['display',value]),ring:(id,value)=>calls.push(['ring',id,value]),startup:on=>{calls.push(['startup',on]);return Promise.resolve();}};
  vm.runInNewContext(fs.readFileSync(require.resolve('../src/renderer.js'),'utf8'),{notchPath:require('../src/notch-shape.js').notchPath,document:{body,getElementById:id=>ids[id],createElement:()=>new Element(),createElementNS:()=>new Element(),addEventListener(){}},window:{notch,innerWidth:420,innerHeight:400,addEventListener(){}},setTimeout:fn=>{delayed=fn;return 1;},clearTimeout:()=>{delayed=null;}});
  return {ids,body,calls,state,push:callback,leave:()=>{body.onmouseleave();delayed?.();}};
 }
@@ -94,4 +94,22 @@ test('alert settings are shown and sent',()=>{
  assert.equal(ui.ids.alerts.checked,true);assert.equal(ui.ids['alert-seconds'].value,'15');
  ui.ids['alert-seconds'].onchange({target:{value:'20'}});assert.equal(JSON.stringify(ui.calls.at(-1)),JSON.stringify(['alerts',{seconds:20}]));
  ui.ids.alerts.onchange({target:{checked:false}});assert.equal(JSON.stringify(ui.calls.at(-1)),JSON.stringify(['alerts',{enabled:false}]));
+});
+
+test('the ring follows the account choice',()=>{
+ const ui=setup();const two=[{label:'Session',percent:20},{label:'Weekly',percent:70}];
+ ui.push({...ui.state,accounts:[{...ui.state.accounts[0],windows:two,ring:'highest'}]});
+ assert.equal(ui.ids.compact.children[0].children[1].textContent,'70%');
+ ui.push({...ui.state,accounts:[{...ui.state.accounts[0],windows:two,ring:'auto'}]});
+ assert.equal(ui.ids.compact.children[0].children[1].textContent,'20%');
+});
+test('details show the pace forecast and a seven-day chart',()=>{
+ const ui=setup();const now=Date.now();
+ const a={...ui.state.accounts[0],forecasts:{Session:{eta:now+3600000,beforeReset:true}},history:{Session:[10,null,40,95,20,30,25]}};
+ ui.push({...ui.state,historyDays:[6,5,4,3,2,1,0].map(d=>now-d*86400000),accounts:[a]});
+ const row=ui.ids.accounts.children[0],texts=row.children.map(c=>c.textContent||'');
+ assert.ok(texts.some(t=>/At this pace: runs out around .*before it resets/.test(t)));
+ const chart=row.children.find(c=>c.className==='history');assert.ok(chart,'chart present');
+ const bars=chart.children[1].children.filter(c=>/history-bar/.test(c.attributes.class||''));
+ assert.equal(bars.length,6,'the empty day draws no bar');assert.ok(bars.some(b=>/level-warning/.test(b.attributes.class)));
 });
