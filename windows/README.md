@@ -1,10 +1,10 @@
 # AI Notch for Windows
 
-A tray application with the Mac-style flared black notch and circular usage rings at any screen edge. Hover to reveal rings and percentages, then hover a ring for account details. Hover the settings arc to reveal its gear; click to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.7 release notes](RELEASE-NOTES.md).
+A tray application with the Mac-style flared black notch and circular usage rings at any screen edge. Hover to reveal rings and percentages, then hover a ring for account details. Click the gear to enable accounts or change placement. Close/hidden widgets can be restored through the system tray. See [v0.3.8 release notes](RELEASE-NOTES.md).
 
 ## Run on Windows
 
-Download **AI-Notch-0.3.7-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.7) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
+Download **AI-Notch-0.3.8-Windows-Setup.exe** from the [release page](https://github.com/s-chathuranga-j/AI-Notch/releases/tag/windows-v0.3.8) and run it. The installer selects the native x64 or ARM64 app, installs for your Windows user without an administrator account, creates Start menu and desktop shortcuts, and launches AI Notch. Uninstall through **Settings → Apps → Installed apps**. Preferences are preserved during upgrades and uninstall.
 
 Quit any existing copy through its tray menu before installing. If you previously used a ZIP, the installed app uses the same saved preferences; your extracted portable folder is left untouched.
 

@@ -30,6 +30,10 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.3.13", headline: "Hear about a limit before it stops you.", changes: [
+            .init(title: "Usage alerts", detail: "When any limit reaches 90%, the notch comes out on its own, even when it is set to Show on hover or Hide, then goes back after a few seconds."),
+            .init(title: "Choose how long it stays", detail: "Turn alerts off or set how many seconds they stay on screen in Settings → Appearance.")
+        ]),
         ReleaseNote(version: "0.3.12", headline: "Clearer update recovery.", changes: [
             .init(title: "Restart before updating a replaced app", detail: "AI Notch checks its running code identity before starting an update. If the app was replaced while open, it asks you to quit and reopen it before trying again."),
             .init(title: "Simpler update wording", detail: "The update message uses separate sentences for the available and installed versions.")
