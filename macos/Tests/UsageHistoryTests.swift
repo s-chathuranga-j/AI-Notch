@@ -47,6 +47,16 @@ final class UsageHistoryTests: XCTestCase {
         XCTAssertEqual(percents(history).count, 4, "a drop is a new sample")
     }
 
+    func testAReadingIsStampedWhenItWasMeasuredAndNotRecordedTwice() {
+        var history = UsageHistory()
+        var reading = snapshot(40)
+        reading.observedAt = t0
+        history.add(reading, now: t0.addingTimeInterval(2 * minute))
+        XCTAssertFalse(history.add(reading, now: t0.addingTimeInterval(9 * minute)),
+                       "the same reading, re-published later, is not a new sample")
+        XCTAssertEqual(history.samples(providerID: "c", windowID: "session").map(\.at), [t0])
+    }
+
     func testIgnoresStaleReadingsPrunesForgetsAndRoundTrips() throws {
         var history = UsageHistory()
         XCTAssertFalse(history.add(snapshot(50, status: .stale(since: t0)), now: t0))

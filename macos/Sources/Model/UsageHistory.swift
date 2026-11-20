@@ -56,26 +56,32 @@ struct UsageHistory: Equatable {
     @discardableResult
     mutating func add(_ snapshot: ProviderSnapshot, now: Date = Date()) -> Bool {
         guard UsageAlertTracker.isTrusted(snapshot) else { return false }
+        // Stamped with when the source measured it, where it says: the store
+        // re-publishes an unchanged reading whenever any provider updates, and
+        // stamping that with the app's clock would keep an old number looking
+        // fresh — and two copies of one reading can fake a pace.
+        let at = snapshot.observedAt ?? now
         var changed = false
         for window in snapshot.windows {
             guard let used = window.usedFraction, used.isFinite else { continue }
             let percent = used * 100
             let key = Self.key(snapshot.id, window.id)
             var list = series[key] ?? []
+            if let last = list.last, at <= last.at { continue }
             // Within `sampleGap` of the sample before it, the newest reading
             // replaces the trailing one — with its own timestamp, so the series
             // never backdates a reading and the forecast is not early. A drop
             // (a reset) is always kept as a new sample, so the forecast can see
             // the new window start.
             if list.count >= 2, let last = list.last,
-               now.timeIntervalSince(list[list.count - 2].at) < Self.sampleGap,
+               at.timeIntervalSince(list[list.count - 2].at) < Self.sampleGap,
                percent >= last.percent {
-                list[list.count - 1] = UsageSample(at: now, percent: percent)
+                list[list.count - 1] = UsageSample(at: at, percent: percent)
                 series[key] = list
                 changed = true
                 continue
             }
-            list.append(UsageSample(at: now, percent: percent))
+            list.append(UsageSample(at: at, percent: percent))
             series[key] = list
             changed = true
         }

@@ -370,7 +370,15 @@ private struct AccountRow: View {
 
     private var ringBinding: Binding<RingChoice> {
         Binding(
-            get: { preferences.ringChoice(for: provider.id) },
+            // A saved window the provider no longer reports matches no row,
+            // and the ring has already fallen back to the headline — so the
+            // picker says so too.
+            get: {
+                let choice = preferences.ringChoice(for: provider.id)
+                if case .window(let id) = choice,
+                   !provider.windows.contains(where: { $0.id == id }) { return .provider }
+                return choice
+            },
             set: { preferences.setRingChoice($0, for: provider.id) }
         )
     }

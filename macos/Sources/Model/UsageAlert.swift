@@ -87,8 +87,17 @@ struct UsageAlertTracker {
     ///
     /// A window re-arms as it drops back below a level, so the next climb is
     /// announced again. Jumping past two levels at once reports the higher.
+    ///
+    /// `silent` is for while alerts are muted — switched off, or quiet hours.
+    /// The state still follows the readings downward, so a window that dropped
+    /// back re-arms and a reset clears its "alerted" mark, but nothing is
+    /// reported and no level is raised. Frozen instead, unmuting could announce
+    /// a reset from days ago, or miss a fresh crossing of a level the window had
+    /// left and come back to; and a window that climbed past a level while muted
+    /// is announced when the mute ends, not lost.
     mutating func update(_ snapshots: [ProviderSnapshot],
-                         thresholds: Set<Int> = defaultThresholds) -> Result {
+                         thresholds: Set<Int> = defaultThresholds,
+                         silent: Bool = false) -> Result {
         let levels = Self.clean(thresholds)
         var result = Result()
         for snapshot in snapshots where Self.isTrusted(snapshot) {
@@ -97,6 +106,15 @@ struct UsageAlertTracker {
                 let key = Self.key(snapshot.id, window.id)
                 var s = state[key] ?? WindowState()
                 let reached = levels.last { used >= Double($0) / 100 } ?? 0
+                if silent {
+                    s.level = min(s.level, reached)
+                    if used < Self.recoveredBelow {
+                        s.alerted = false
+                        s.paced = false
+                    }
+                    state[key] = s
+                    continue
+                }
                 if reached > s.level {
                     result.crossed.append(Crossing(providerID: snapshot.id, windowID: window.id,
                                                    label: window.label, usedFraction: used,

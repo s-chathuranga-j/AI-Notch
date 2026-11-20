@@ -200,6 +200,23 @@ final class UsageAlertTests: XCTestCase {
                                      thresholds: [90], paceAlerts: true), [])
     }
 
+    /// While muted the state follows the readings down: a reset during the
+    /// mute is not announced afterwards, and a fresh crossing still is.
+    func testMutedReadingsReArmWithoutAnnouncingAnything() {
+        var tracker = UsageAlertTracker()
+        _ = tracker.update([snapshot("c", session: 0.95)])
+        let muted = tracker.update([snapshot("c", session: 0.1)], silent: true)
+        XCTAssertEqual(muted, UsageAlertTracker.Result())
+        XCTAssertEqual(tracker.update([snapshot("c", session: 0.1)]).recovered, [],
+                       "a reset that happened while muted is old news")
+        XCTAssertEqual(crossed(&tracker, [snapshot("c", session: 0.92)]), [90])
+
+        // Climbing while muted raises nothing, so it is announced on unmute.
+        var climbing = UsageAlertTracker()
+        _ = climbing.update([snapshot("c", session: 0.95)], silent: true)
+        XCTAssertEqual(crossed(&climbing, [snapshot("c", session: 0.95)]), [90])
+    }
+
     func testAlertDurationIsClamped() {
         XCTAssertEqual(Preferences.clampAlertSeconds(0), Preferences.alertSecondsRange.lowerBound)
         XCTAssertEqual(Preferences.clampAlertSeconds(10), 10)

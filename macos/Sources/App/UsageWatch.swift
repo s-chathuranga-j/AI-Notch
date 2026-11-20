@@ -30,9 +30,9 @@ final class UsageWatch {
     /// readings as the providers reported them: alerts are per window, and do
     /// not care which one the ring stands for.
     ///
-    /// With `judge` false — alerts off, or quiet hours — the tracker is not
-    /// told at all, so a limit that is still high when they end is announced
-    /// then rather than lost.
+    /// With `judge` false — alerts off, or quiet hours — the tracker follows
+    /// the readings silently, so a limit that climbed while muted is announced
+    /// when the mute ends rather than lost, and nothing stale is announced.
     func receive(_ snapshots: [ProviderSnapshot], record: Bool, judge: Bool,
                  thresholds: Set<Int>, paceAlerts: Bool,
                  now: Date = Date()) -> [UsageNotice] {
@@ -42,7 +42,10 @@ final class UsageWatch {
             saveIfDue(now: now)
         }
         tracker.retain(providerIDs: Set(snapshots.map(\.id)))
-        guard judge else { return [] }
+        guard judge else {
+            _ = tracker.update(snapshots, thresholds: thresholds, silent: true)
+            return []
+        }
         return tracker.notices(for: snapshots, thresholds: thresholds,
                                paceAlerts: paceAlerts,
                                forecasts: insights(for: snapshots, now: now).mapValues(\.forecasts),
