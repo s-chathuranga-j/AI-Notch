@@ -1,4 +1,11 @@
-# AI Notch for Windows v0.4.1 — Preview
+# AI Notch for Windows v0.4.2 (Preview)
+
+- **Claude Enterprise credits.** Accounts billed by credits have no session or weekly limits, so nothing reached the status line and Claude showed no usage. AI Notch now falls back to the Claude Code login and shows monthly credit use as **Credits**. The status line reading is still used first whenever it exists.
+- **Work label.** Enterprise and Team logins are labelled **Claude · Work**. Saved settings and history carry over unchanged.
+
+The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs and SHA-256 checksums are included. This is an unsigned preview.
+
+## Earlier release: Windows v0.4.1
 
 - **History from day one.** The seven-day chart in account details now appears from the first day with a reading and fills in over the week, instead of staying hidden until a second day.
 
