@@ -44,7 +44,8 @@ test('Claude setup quotes profile paths and passes PowerShell a shell-safe argum
   const encoded=data.statusLine.command.match(/^powershell\.exe -NoProfile -NonInteractive -EncodedCommand ([A-Za-z0-9+/=]+)$/)[1];
   const script=Buffer.from(encoded,'base64').toString('utf16le');
   assert.ok(script.includes("$settingsPath = 'C:/AI Notch/settings.json'"));
-  assert.ok(script.includes("$readingPath = 'C:/Users/O''Neil/.claude-work/ai-notch-usage-windows.json'"));
+  const readingPath=path.join("C:/Users/O''Neil/.claude-work",'ai-notch-usage-windows.json');
+  assert.ok(script.includes(`$readingPath = '${readingPath}'`));
   assert.ok(script.includes("$profileId = 'claude-work'"));
   assert.ok(script.includes("@('five_hour', 'seven_day', 'spend_limit')"));
 });
