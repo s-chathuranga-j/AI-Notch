@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     private var watch: UsageWatch?
     private var notifier: SystemNotifier?
+    private var hotKey: PeekHotKey?
     private var cancellables = Set<AnyCancellable>()
 
     /// The unit bundle is hosted by this app, so `xcodebuild test` launches it
@@ -161,23 +162,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .sink { watch.forget(providerIDs: $0) }
                 .store(in: &cancellables)
 
+            // The ring follows the user's choice of window; alerts and the
+            // history still see every window as the provider reported it.
+            let pointRings = { (readings: [ProviderSnapshot]) in
+                readings.map { $0.applying(preferences.ringChoice(for: $0.id)) }
+            }
+            preferences.$ringChoices
+                .dropFirst()
+                .receive(on: RunLoop.main)
+                .sink { [weak controller] _ in
+                    // `@Published` delivers before the new value is stored;
+                    // the hop onto the run loop above is what lets this read it.
+                    let pointed = pointRings(watch.lastReadings)
+                    controller?.model.snapshots = pointed
+                    controller?.model.insights = watch.insights(for: pointed)
+                }
+                .store(in: &cancellables)
+
+            // A look from any app. The same trip out as an alert, without the
+            // tint or the notification.
+            let hotKey = PeekHotKey { [weak controller] in
+                controller?.announceUsageAlert(duration: TimeInterval(preferences.usageAlertSeconds))
+            }
+            self.hotKey = hotKey
+            preferences.$peekShortcut
+                .receive(on: RunLoop.main)
+                .sink { shortcut in
+                    preferences.peekShortcutProblem = hotKey.register(shortcut)
+                        ? nil : "Another app is using this shortcut. Choose a different one."
+                }
+                .store(in: &cancellables)
+
             store.$snapshots
                 .receive(on: RunLoop.main)
                 .sink { [weak controller] snapshots in
                     let shown = isDemo ? Fixtures.snapshots() : snapshots
                     withAnimation(NotchMotion.unfold) {
-                        controller?.model.snapshots = shown
+                        controller?.model.snapshots = pointRings(shown)
                     }
                     let now = Date()
                     controller?.model.now = now
                     // Fed on every reading, alerts on or off, so switching them
                     // on later does not announce a limit that was crossed long ago.
-                    let (insights, notices) = watch.receive(
+                    let notices = watch.receive(
                         shown, record: !isDemo,
                         thresholds: preferences.usageAlertThresholds,
                         paceAlerts: preferences.paceAlertsEnabled, now: now
                     )
-                    controller?.model.insights = insights
+                    controller?.model.insights = watch.insights(for: pointRings(shown), now: now)
                     guard !notices.isEmpty, !preferences.quietHours.contains(now) else { return }
                     if preferences.systemNotificationsEnabled {
                         for notice in notices { notifier.post(notice) }

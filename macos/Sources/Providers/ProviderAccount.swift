@@ -134,4 +134,12 @@ struct ProviderSummary: Identifiable, Equatable {
     /// nothing is indistinguishable from a broken one.
     var wasRefusedAccess: Bool = false
     var statusLineCommand: String?
+    /// The metered windows in the last reading, so Settings can offer each as
+    /// the one the ring stands for.
+    var windows: [WindowOption] = []
+
+    struct WindowOption: Identifiable, Equatable {
+        let id: String
+        let label: String
+    }
 }

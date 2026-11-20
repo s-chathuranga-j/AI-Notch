@@ -145,7 +145,7 @@ struct SettingsView: View {
 
                 HStack(spacing: 16) {
                     ForEach(UsageAlertTracker.thresholds, id: \.self) { level in
-                        Toggle("\(level)%", isOn: thresholdBinding(level))
+                        Toggle(isOn: thresholdBinding(level)) { Text(verbatim: "\(level)%") }
                             .toggleStyle(.checkbox)
                     }
                 }
@@ -169,6 +169,16 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Toggle("Also show notifications", isOn: $preferences.systemNotificationsEnabled)
+
+                Picker("Peek shortcut", selection: $preferences.peekShortcut) {
+                    ForEach(PeekShortcut.allCases) { Text($0.title).tag($0) }
+                }
+
+                Text(preferences.peekShortcutProblem
+                     ?? "Brings the notch out for a few seconds from any app.")
+                    .font(.caption)
+                    .foregroundStyle(preferences.peekShortcutProblem == nil ? Color.secondary : Color.orange)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Toggle("Quiet hours", isOn: $preferences.quietHoursEnabled)
                 HStack {
@@ -335,7 +345,28 @@ private struct AccountRow: View {
             detail
                 .font(.caption)
                 .padding(.leading, 26)
+
+            // Only where there is a choice to make: one window is one ring.
+            if isConnected, provider.windows.count > 1 {
+                Picker("Ring shows", selection: ringBinding) {
+                    Text("First limit").tag(RingChoice.provider)
+                    Text("Closest to its limit").tag(RingChoice.closest)
+                    ForEach(provider.windows) { window in
+                        Text(window.label).tag(RingChoice.window(window.id))
+                    }
+                }
+                .controlSize(.small)
+                .font(.caption)
+                .padding(.leading, 26)
+            }
         }
+    }
+
+    private var ringBinding: Binding<RingChoice> {
+        Binding(
+            get: { preferences.ringChoice(for: provider.id) },
+            set: { preferences.setRingChoice($0, for: provider.id) }
+        )
     }
 
     @ViewBuilder

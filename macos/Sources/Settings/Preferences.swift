@@ -76,6 +76,29 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(systemNotificationsEnabled, forKey: Keys.notifications) }
     }
 
+    /// Which window each provider's ring stands for, by provider id. Absent
+    /// means the provider's own headline.
+    @Published var ringChoices: [String: String] {
+        didSet { defaults.set(ringChoices, forKey: Keys.ringChoices) }
+    }
+
+    func ringChoice(for providerID: String) -> RingChoice {
+        RingChoice(rawValue: ringChoices[providerID])
+    }
+
+    func setRingChoice(_ choice: RingChoice, for providerID: String) {
+        ringChoices[providerID] = choice == .provider ? nil : choice.rawValue
+    }
+
+    /// The system-wide shortcut that brings the notch out for a look.
+    @Published var peekShortcut: PeekShortcut {
+        didSet { defaults.set(peekShortcut.rawValue, forKey: Keys.peekShortcut) }
+    }
+
+    /// Set when the shortcut could not be registered — another app holds it.
+    /// Not stored: it is a fact about this launch, not a choice.
+    @Published var peekShortcutProblem: String?
+
     nonisolated static let alertSecondsRange = 3...60
     nonisolated static let defaultAlertSeconds = 10
 
@@ -134,6 +157,8 @@ final class Preferences: ObservableObject {
         static let quietStart = "quietHoursStart"
         static let quietEnd = "quietHoursEnd"
         static let notifications = "systemNotificationsEnabled"
+        static let ringChoices = "ringChoices"
+        static let peekShortcut = "peekShortcut"
     }
 
     /// True the very first time this copy runs, and never again.
@@ -206,6 +231,9 @@ final class Preferences: ObservableObject {
         // Off until asked for: turning it on is what prompts macOS for
         // permission, and a prompt nobody asked for is one people refuse.
         self.systemNotificationsEnabled = defaults.bool(forKey: Keys.notifications)
+        self.ringChoices = defaults.dictionary(forKey: Keys.ringChoices) as? [String: String] ?? [:]
+        self.peekShortcut = defaults.string(forKey: Keys.peekShortcut)
+            .flatMap(PeekShortcut.init(rawValue:)) ?? .controlOptionN
         // Absent means never chosen. The Dock is the default because it is the
         // findable one — a new user who cannot see the app anywhere has no way
         // to learn it is running.

@@ -129,7 +129,10 @@ final class UsageStore: ObservableObject {
                             signIn: provider.signInRoute,
                             wasRefusedAccess: refusedAccess.contains(provider.id),
                             statusLineCommand: (provider as? ClaudeStatusLineProvider)?.command
-                                ?? (provider as? ClaudeOAuthProvider)?.statusLineCommand)
+                                ?? (provider as? ClaudeOAuthProvider)?.statusLineCommand,
+                            windows: (snapshots.first { $0.id == provider.id }?.windows ?? [])
+                                .filter { $0.usedFraction != nil }
+                                .map { ProviderSummary.WindowOption(id: $0.id, label: $0.label) })
         }
     }
 

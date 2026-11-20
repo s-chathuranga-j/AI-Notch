@@ -37,7 +37,9 @@ enum ReleaseNotes {
             .init(title: "Pace warnings", detail: "When the recent pace would run a limit out before it resets, within the hour, the notch comes out once to say so. Hover a ring to see when it runs out at this pace."),
             .init(title: "Back in business", detail: "A limit that alerted and then resets brings the notch out once more, in green."),
             .init(title: "Seven-day peaks", detail: "Hover a ring to see the highest reading on each of the last seven days. Only percentages and times are kept, on this Mac, for eight days."),
-            .init(title: "Quiet hours and notifications", detail: "Keep alerts quiet overnight, and optionally get a macOS notification as well.")
+            .init(title: "Quiet hours and notifications", detail: "Keep alerts quiet overnight, and optionally get a macOS notification as well."),
+            .init(title: "Choose what a ring shows", detail: "In Settings, point each provider's ring at its first limit, a named limit, or whichever is closest to running out."),
+            .init(title: "Peek from anywhere", detail: "Press Control-Option-N to bring the notch out for a look. Choose another shortcut or turn it off in Settings → Alerts.")
         ]),
         ReleaseNote(version: "0.3.12", headline: "Clearer update recovery.", changes: [
             .init(title: "Restart before updating a replaced app", detail: "AI Notch checks its running code identity before starting an update. If the app was replaced while open, it asks you to quit and reopen it before trying again."),

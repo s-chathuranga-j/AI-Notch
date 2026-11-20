@@ -13,6 +13,9 @@ final class UsageWatch {
     private let file: UsageHistoryFile?
     private var lastSave = Date.distantPast
     private var unsaved = false
+    /// The last round of readings, so a change of ring choice can be applied
+    /// without waiting for the next refresh.
+    private(set) var lastReadings: [ProviderSnapshot] = []
 
     /// Writes are batched: a reading lands every couple of minutes per
     /// provider, and the file only needs to survive a restart.
@@ -23,26 +26,34 @@ final class UsageWatch {
         self.history = file?.load() ?? UsageHistory()
     }
 
-    /// Records the readings and returns what the tooltip can now say about
-    /// each provider, and what is worth announcing.
+    /// Records the readings and returns what is worth announcing. Takes the
+    /// readings as the providers reported them: alerts are per window, and do
+    /// not care which one the ring stands for.
     func receive(_ snapshots: [ProviderSnapshot], record: Bool,
                  thresholds: Set<Int>, paceAlerts: Bool,
-                 now: Date = Date()) -> (insights: [String: ProviderInsights], notices: [UsageNotice]) {
+                 now: Date = Date()) -> [UsageNotice] {
+        lastReadings = snapshots
         if record {
             for snapshot in snapshots where history.add(snapshot, now: now) { unsaved = true }
             saveIfDue(now: now)
         }
+        tracker.retain(providerIDs: Set(snapshots.map(\.id)))
+        return tracker.notices(for: snapshots, thresholds: thresholds,
+                               paceAlerts: paceAlerts,
+                               forecasts: insights(for: snapshots, now: now).mapValues(\.forecasts),
+                               now: now)
+    }
+
+    /// What the tooltip can say about each provider. The daily peaks follow
+    /// the ring, so pass the readings with the user's ring choice applied.
+    func insights(for snapshots: [ProviderSnapshot], now: Date = Date()) -> [String: ProviderInsights] {
         var insights: [String: ProviderInsights] = [:]
         for snapshot in snapshots {
             if let made = ProviderInsights.make(for: snapshot, history: history, now: now) {
                 insights[snapshot.id] = made
             }
         }
-        tracker.retain(providerIDs: Set(snapshots.map(\.id)))
-        let notices = tracker.notices(for: snapshots, thresholds: thresholds,
-                                      paceAlerts: paceAlerts,
-                                      forecasts: insights.mapValues(\.forecasts), now: now)
-        return (insights, notices)
+        return insights
     }
 
     /// A provider switched off stops being remembered as well as read.

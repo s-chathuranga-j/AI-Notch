@@ -351,10 +351,15 @@ private struct DailyPeaksChart: View {
             .padding(.top, NotchLayout.peaksBarsToDays)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label) daily peaks: " + peaks.map { day in
-            "\(Self.initials.string(from: day.day)) "
-                + (day.peak.map { "\(Int($0.rounded()))%" } ?? "no data")
-        }.joined(separator: ", "))
+        .accessibilityLabel(Text(verbatim: spoken))
+    }
+
+    private var spoken: String {
+        let days = peaks.map { day -> String in
+            let value = day.peak.map { "\(Int($0.rounded()))%" } ?? "no data"
+            return "\(Self.initials.string(from: day.day)) \(value)"
+        }
+        return "\(label) daily peaks: " + days.joined(separator: ", ")
     }
 }
 
