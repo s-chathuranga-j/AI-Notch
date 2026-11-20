@@ -1,4 +1,4 @@
-# AI Notch for Windows v0.3.8 — Preview
+# AI Notch for Windows v0.4.0 — Preview
 
 AI Notch now tells you when a limit is about to run out, and when it is back.
 

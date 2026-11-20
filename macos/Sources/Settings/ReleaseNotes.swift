@@ -30,7 +30,7 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
-        ReleaseNote(version: "0.3.13", headline: "Hear about a limit before it stops you.", changes: [
+        ReleaseNote(version: "0.4.0", headline: "Hear about a limit before it stops you.", changes: [
             .init(title: "Usage alerts", detail: "When any limit reaches 90%, the notch comes out on its own, even when it is set to Show on hover or Hide, then goes back after a few seconds."),
             .init(title: "Choose how long it stays", detail: "Turn alerts off or set how many seconds they stay on screen in Settings → Alerts."),
             .init(title: "Pick your levels", detail: "Alert at 75%, 90%, 100%, or any mix of them."),
