@@ -260,7 +260,9 @@ struct ProviderInsights: Equatable {
                 history.samples(providerID: snapshot.id, windowID: headline.id),
                 now: now, calendar: calendar
             )
-            if days.filter({ $0.peak != nil }).count >= 2 {
+            // Shown from the first day with a reading: a single bar beside six empty
+            // days says "history is building up", where hiding it said nothing at all.
+            if days.contains(where: { $0.peak != nil }) {
                 insights.peaks = days
                 insights.peaksLabel = headline.label
             }

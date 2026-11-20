@@ -154,7 +154,7 @@ final class UsageHistoryTests: XCTestCase {
         let insights = ProviderInsights.make(for: snapshot(80), history: today,
                                              now: now, calendar: calendar)
         XCTAssertNotNil(insights?.forecasts["session"])
-        XCTAssertNil(insights?.peaks, "one day is not a trend")
+        XCTAssertEqual(insights?.peaks?.compactMap(\.peak).count, 1, "shown from the first day")
 
         let withYesterday = ProviderInsights.make(for: snapshot(80), history: history,
                                                   now: now, calendar: calendar)
