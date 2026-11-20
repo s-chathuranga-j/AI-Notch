@@ -11,16 +11,19 @@ class History{
  // Returns true when something was stored, so the caller knows whether to save.
  add(id,row,now=Date.now()){
   if(!row||row.stale||!Array.isArray(row.windows))return false;
+  // The time the source measured it, when known: a reading re-published later is not new use.
+  const at=Number.isFinite(row.updated)&&row.updated<=now?row.updated:now;
   let changed=false;
   for(const w of row.windows){
    if(!Number.isFinite(w.percent))continue;
    const key=id+sep+w.label,list=this.series.get(key)||[];
    const last=list.at(-1),prev=list.at(-2);
+   if(last&&at<=last[0])continue;
    // Within SAMPLE_GAP of the sample before it, the newest reading replaces the trailing one —
    // with its own timestamp, so the series never backdates a reading. A drop (a reset) is always
    // kept as a new sample so the forecast can see the new window start.
-   if(last&&prev&&now-prev[0]<SAMPLE_GAP&&w.percent>=last[1]){list[list.length-1]=[now,w.percent];changed=true;continue;}
-   list.push([now,w.percent]);this.series.set(key,list);changed=true;
+   if(last&&prev&&at-prev[0]<SAMPLE_GAP&&w.percent>=last[1]){list[list.length-1]=[at,w.percent];changed=true;continue;}
+   list.push([at,w.percent]);this.series.set(key,list);changed=true;
   }
   return this.prune(now)||changed;
  }

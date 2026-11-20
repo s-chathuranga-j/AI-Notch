@@ -105,7 +105,8 @@ function render(state){
   if(state.settings&&a.enabled&&a.windows.filter(w=>Number.isFinite(w.percent)).length>1){
    const pick=document.createElement('select');pick.className='ring-pick';pick.setAttribute('aria-label',`${a.label}: ring shows`);
    for(const [value,name] of [['auto','Ring: first limit'],['highest','Ring: closest to limit'],...a.windows.filter(w=>Number.isFinite(w.percent)).map(w=>[w.label,'Ring: '+w.label])]){const o=document.createElement('option');o.value=value;o.textContent=name;pick.append(o);}
-   pick.value=a.ring||'auto';pick.onchange=()=>window.notch.ring(a.id,pick.value);title.append(pick);
+   // A saved choice whose limit is no longer reported shows as the fallback the ring actually uses.
+   pick.value=a.ring==='highest'||a.windows.some(w=>w.label===a.ring&&Number.isFinite(w.percent))?a.ring:'auto';pick.onchange=()=>window.notch.ring(a.id,pick.value);title.append(pick);
   }
   if(state.settings){const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=a.enabled;toggle.setAttribute('aria-label',`Enable ${a.label}`);toggle.onchange=()=>window.notch.toggle(a.id,toggle.checked);title.append(toggle);}
   row.append(title);
@@ -167,7 +168,12 @@ $('retry').onclick=()=>window.notch.retry();
 $('position').onchange=e=>window.notch.position(e.target.value);
 $('visibility').onchange=e=>window.notch.visibility(e.target.value);
 $('alerts').onchange=e=>window.notch.alerts({enabled:e.target.checked});
-for(const id of ['t75','t90','t100'])$(id).onchange=()=>window.notch.alerts({thresholds:['t75','t90','t100'].filter(t=>$(t).checked).map(t=>Number($(t).value))});
+for(const id of ['t75','t90','t100'])$(id).onchange=e=>{
+ const levels=['t75','t90','t100'].filter(t=>$(t).checked).map(t=>Number($(t).value));
+ // At least one level stays chosen; unticking the last would otherwise quietly mean 90%.
+ if(!levels.length){e.target.checked=true;return;}
+ window.notch.alerts({thresholds:levels});
+};
 $('pace').onchange=e=>window.notch.alerts({pace:e.target.checked});
 $('quiet').onchange=e=>window.notch.alerts({quiet:{enabled:e.target.checked}});
 $('quiet-start').onchange=e=>window.notch.alerts({quiet:{start:e.target.value}});

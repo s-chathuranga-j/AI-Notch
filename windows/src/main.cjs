@@ -50,9 +50,9 @@ function state(){return {demo,settings,expanded,detailId,alerting,alertKind,posi
 function onReading(id,row){
  if(!poller.enabled.has(id))return;
  if(!demo&&history.add(id,row))saveHistorySoon();
- // Alerts off silences everything, notifications included. During quiet hours the tracker is not
- // told either, so a limit that is still high when they end is announced then, not lost.
- if(!config.alerts||isQuiet(config.quiet))return;
+ // Alerts off silences everything, notifications included. During quiet hours the tracker follows
+ // along silently, so a limit that is still high when they end is announced then, not lost.
+ if(!config.alerts||isQuiet(config.quiet)){alerts.update(id,row,config.alertThresholds,true);return;}
  const result=alerts.update(id,row,config.alertThresholds);
  let kind=null,detail=null;
  if(result.crossed.length){kind='limit';detail=result.crossed.at(-1);}
@@ -88,15 +88,17 @@ function saveHistorySoon(){
  historyTimer=setTimeout(()=>{historyTimer=null;saveHistory().catch(()=>log('history-save-failed'));},60000);
 }
 // Writes are chained, like save(), so two can never interleave on history.json.tmp.
-let historySaving=Promise.resolve();
+let historySaving=Promise.resolve(),historyWrites=0;
 function saveHistory(){
  if(demo)return Promise.resolve();
  const directory=app.getPath('userData'),file=path.join(directory,'history.json');
+ historyWrites++;
  historySaving=historySaving.catch(()=>{}).then(async()=>{
   await fs.mkdir(directory,{recursive:true});
   await fs.writeFile(file+'.tmp',JSON.stringify(history),{mode:0o600});
-  await fs.rename(file+'.tmp',file);
- });
+  // Once quitting, the synchronous write owns history.json; an older snapshot must not replace it.
+  if(!app.quitting)await fs.rename(file+'.tmp',file);
+ }).finally(()=>{historyWrites--;});
  return historySaving;
 }
 // On the way out there is no time for an async write to land, so the last one is synchronous.
@@ -105,8 +107,8 @@ function saveHistoryNow(){
  try{
   const directory=app.getPath('userData'),file=path.join(directory,'history.json');
   fsSync.mkdirSync(directory,{recursive:true});
-  fsSync.writeFileSync(file+'.tmp',JSON.stringify(history),{mode:0o600});
-  fsSync.renameSync(file+'.tmp',file);
+  fsSync.writeFileSync(file+'.quit.tmp',JSON.stringify(history),{mode:0o600});
+  fsSync.renameSync(file+'.quit.tmp',file);
  }catch{log('history-save-failed');}
 }
 function registerShortcut(){
@@ -145,7 +147,7 @@ function save(){
  return saving;
 }
 async function refresh(){await Promise.all(accounts.map(a=>poller.refresh(a)));}
-function stop(){if(!app.quitting&&historyTimer){clearTimeout(historyTimer);historyTimer=null;saveHistoryNow();}app.quitting=true;clearTimeout(wakeTimer);clearTimeout(alertTimer);try{globalShortcut?.unregisterAll();}catch{}clearInterval(refreshTimer);poller.cancelPending();}
+function stop(){if(!app.quitting&&(historyTimer||historyWrites>0)){clearTimeout(historyTimer);historyTimer=null;saveHistoryNow();}app.quitting=true;clearTimeout(wakeTimer);clearTimeout(alertTimer);try{globalShortcut?.unregisterAll();}catch{}clearInterval(refreshTimer);poller.cancelPending();}
 function fatal(event,error){
  if(app.quitting)return;
  log(event,error?.code);stop();
@@ -217,6 +219,9 @@ if(!app.requestSingleInstanceLock())app.quit();else {
     if(typeof saved.display==='string')config.display=saved.display;
     if(saved.ring&&typeof saved.ring==='object')config.ring=Object.fromEntries(Object.entries(saved.ring).filter(([k,v])=>typeof k==='string'&&typeof v==='string'));}catch{}
    try{history=new History(JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'history.json'),'utf8')));}catch{}
+   // Anything left from an account that is now disabled goes, in case its deletion never landed.
+   let stale=false;for(const id of [...history.series.keys()].map(k=>k.split('\u001f')[0]))if(!config.enabled.includes(id)&&history.forget(id))stale=true;
+   if(stale)saveHistory().catch(()=>log('history-save-failed'));
   }
   config.enabled.forEach(id=>poller.enabled.add(id));
   session.defaultSession.webRequest.onBeforeRequest((details,callback)=>callback({cancel:!details.url.startsWith('file:')}));

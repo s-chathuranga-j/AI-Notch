@@ -42,3 +42,11 @@ test('daily peaks cover seven local days with gaps left empty',()=>{
  const peaks=dailyPeaks(s,T0);
  assert.equal(peaks.length,7);assert.equal(peaks.at(-1).peak,55);assert.equal(peaks.at(-3).peak,80);assert.equal(peaks.at(-2).peak,null);
 });
+test('history uses the reading time and ignores a reading published again',()=>{
+ const h=new History();
+ h.add('c',{...row(40),updated:T0},T0+MINUTE);
+ h.add('c',{...row(40),updated:T0},T0+3*MINUTE);
+ assert.deepEqual(h.samples('c','Session'),[[T0,40]]);
+ h.add('c',{...row(50),updated:T0+10*MINUTE},T0+10*MINUTE);
+ assert.deepEqual(h.samples('c','Session').at(-1),[T0+10*MINUTE,50]);
+});

@@ -64,3 +64,12 @@ test('quiet hours, including ones that wrap midnight',()=>{
  assert.equal(isQuiet({enabled:true,start:'12:00',end:'13:00'},at(12,15)),true);
  assert.equal(isQuiet({...night,enabled:false},at(23)),false);assert.equal(isQuiet({enabled:true,start:'9',end:'10:00'},at(9,30)),false);
 });
+test('while muted the tracker follows silently: no stale reset, and a still-high limit counts again',()=>{
+ const t=new AlertTracker();
+ t.update('c',row(92));
+ assert.deepEqual(t.update('c',row(3),[90],true),{crossed:[],recovered:[]});
+ assert.deepEqual(t.update('c',row(2)).recovered,[],'the reset happened while muted');
+ t.update('c',row(95));t.update('c',row(95),[90],true);
+ const quietHigh=new AlertTracker();quietHigh.update('c',row(95),[90],true);
+ assert.equal(crossed(quietHigh.update('c',row(95))),true,'announced when the mute ends');
+});

@@ -43,7 +43,11 @@ class AlertTracker{
  constructor(){this.state=new Map();}
  key(id,label){return id+'\u001f'+label;}
  // Returns what this reading means: thresholds newly crossed, and windows that have reset.
- update(id,row,thresholds=[THRESHOLD]){
+ //
+ // With `silent` (alerts off, quiet hours) the tracker still follows the window down — re-arming
+ // and forgetting a reset — but never raises its level or reports anything. So when the mute ends,
+ // a window still above a level is a new crossing, and a reset that happened meanwhile is not news.
+ update(id,row,thresholds=[THRESHOLD],silent=false){
   const result={crossed:[],recovered:[]};
   if(!row||row.stale)return result;
   const list=cleanThresholds(thresholds);
@@ -51,6 +55,11 @@ class AlertTracker{
    if(!Number.isFinite(w.percent))continue;
    const key=this.key(id,w.label),s=this.state.get(key)||{level:0,alerted:false,paced:false};
    const reached=list.filter(t=>w.percent>=t).at(-1)||0;
+   if(silent){
+    s.level=Math.min(s.level,reached);
+    if(w.percent<RECOVERED_BELOW){s.alerted=false;s.paced=false;}
+    this.state.set(key,s);continue;
+   }
    if(reached>s.level){result.crossed.push({label:w.label,percent:w.percent,threshold:reached});s.alerted=true;}
    s.level=reached;
    if(w.percent<RECOVERED_BELOW){if(s.alerted)result.recovered.push({label:w.label,percent:w.percent});s.alerted=false;s.paced=false;}

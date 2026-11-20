@@ -40,6 +40,9 @@ jobs:
         run: |
           version=$(node -p "require('./package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "windows-v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1
+          fi
           # The commit actually checked out, which on a manual run may not be github.sha.
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           cd dist

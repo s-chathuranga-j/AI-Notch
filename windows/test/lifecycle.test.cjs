@@ -12,6 +12,7 @@ async function boot(t,options={}){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ainotch-life-'));
  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  fs.writeFileSync(path.join(directory,'settings.json'),JSON.stringify({enabled:options.enabled||[],position:'right',visibility:options.visibility||'onHover',...options.saved}));
+ if(options.history)fs.writeFileSync(path.join(directory,'history.json'),JSON.stringify(options.history));
  const app=new EventEmitter(),ipc=new EventEmitter(),power=new EventEmitter(),screen=new EventEmitter(),processMock=new EventEmitter();
  const windows=[],trays=[],handlers=new Map(),ready=[],timers=new Map(),intervals=new Map(),exits=[],relaunches=[],dialogs=[],loginWrites=[];
  let nextTimer=0,approved=options.approved!==false,registered=!!options.registered;
@@ -199,7 +200,7 @@ test('a limit that was alerted on comes out once more, in green, when it resets'
 });
 test('quiet hours hold alerts back; notifications follow the setting',async t=>{
  const hour=new Date().getHours(),pad=n=>String(n).padStart(2,'0');
- const quiet={enabled:true,start:pad(hour)+':00',end:pad((hour+1)%24)+':00'};
+ const quiet={enabled:true,start:pad((hour+23)%24)+':00',end:pad((hour+2)%24)+':00'};
  const ui=await boot(t,{visibility:'hidden',enabled:['claude'],saved:{quiet},usage:()=>[{label:'Session',percent:95,reset:null}]});
  await flush();assert.equal(ui.windows[0].visible,false);assert.equal(ui.notifications.length,0);
  const loud=await boot(t,{enabled:['claude'],saved:{systemNotifications:true},usage:()=>[{label:'Session',percent:95,reset:null}]});
@@ -243,4 +244,11 @@ test('changing visibility during an alert clears its notices',async t=>{
  await flush();assert.equal(ui.state().accounts[0].notice,'limit');
  await ui.invoke('visibility','always');assert.equal(ui.state().alerting,false);
  ui.shortcuts.get('Control+Alt+N')();assert.equal(ui.state().accounts[0].notice,null);
+});
+test('history left behind by a disabled account is removed at startup',async t=>{
+ const now=Date.now();
+ const ui=await boot(t,{enabled:['claude'],history:{version:1,series:{'claude\u001fSession':[[now,40]],'gone\u001fSession':[[now,70]]}}});
+ for(let i=0;i<20&&JSON.parse(fs.readFileSync(path.join(ui.directory,'history.json'),'utf8')).series['gone\u001fSession'];i++)await new Promise(r=>setTimeout(r,10));
+ const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'history.json'),'utf8'));
+ assert.equal(saved.series['gone\u001fSession'],undefined);assert.ok(saved.series['claude\u001fSession']);
 });
