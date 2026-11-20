@@ -22,6 +22,7 @@ function usageRing(account){
 function updateShape(){
  $('notch-outline').setAttribute('d',notchPath(window.innerWidth,window.innerHeight,current?.position||'top'));
 }
+function levelFor(percent){return Number.isFinite(percent)?percent>=100?'critical':percent>=90?'warning':null:null;}
 function usageSummary(account){
  if(!account.enabled)return '—';
  if(account.stale)return 'Stale';
@@ -31,18 +32,21 @@ function usageSummary(account){
 function render(state){
  if(!state)return;
  if(state.settings!==current?.settings){selected=null;isExpanded=state.expanded;}
+ if(state.alerting)isExpanded=true;
+ else if(current?.alerting&&!current?.settings&&!state.settings){isExpanded=!!state.expanded;if(!isExpanded)selected=null;}
  if(state.visibility==='always')isExpanded=true;
  current=state;document.body.dataset.position=state.position;updateShape();
  $('settings').setAttribute('aria-expanded',String(state.settings));
- document.body.classList.toggle('settings',state.settings);
+ document.body.classList.toggle('settings',state.settings);document.body.classList.toggle('alerting',!!state.alerting);
  $('preferences').hidden=!state.settings;$('position').value=state.position;$('visibility').value=state.visibility||'onHover';
+ $('alerts').checked=state.alerts!==false;$('alert-seconds').value=String(state.alertSeconds||10);$('alert-seconds').disabled=state.alerts===false;
  $('startup').checked=!!state.startWithWindows;$('startup').disabled=!state.startupAvailable;
  $('startup-status').textContent=state.startupError||(state.startupAvailable?'':'Available in the installed Windows app.');
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
  $('accounts').replaceChildren();$('compact').replaceChildren();
  for(const a of state.accounts){
   const stale=!!a.stale&&a.enabled&&a.windows.length>0;
-  const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}${stale?' stale':''}`);chip.type='button';
+  const chip=text('button','',`subscription-chip${a.enabled?'':' disabled'}${stale?' stale':''}${a.level?' level-'+a.level:''}`);chip.type='button';
   chip.setAttribute('aria-label',`${a.label}: ${usageSummary(a)}. ${a.enabled?(stale?`${a.status} Showing the last reading.`:a.status):'Disabled'}`);
   chip.setAttribute('aria-controls','accounts');chip.dataset.account=a.id;chip.dataset.provider=a.kind;
   chip.onmouseenter=()=>showDetail(a.id);chip.onfocus=()=>showDetail(a.id);chip.onclick=()=>showDetail(a.id);
@@ -65,7 +69,7 @@ function render(state){
     if(a.updated)row.append(text('small',`Last reading · ${new Date(a.updated).toLocaleString()}`,'status'));
    }
    for(const w of a.windows){
-    const line=text('div','','meter');line.append(text('span',w.label),text('b',w.unlimited?'Unlimited':`${Math.round(w.percent)}%`));
+    const level=stale?null:levelFor(w.percent);const line=text('div','',level?'meter level-'+level:'meter');line.append(text('span',w.label),text('b',w.unlimited?'Unlimited':`${Math.round(w.percent)}%`));
     if(!w.unlimited&&!stale){const progress=document.createElement('progress');progress.setAttribute('aria-label',`${a.label} ${w.label} usage`);progress.max=100;progress.value=Math.max(0,Math.min(100,w.percent));line.append(progress);}
     row.append(line);if(w.reset)row.append(text('small',`Resets ${new Date(w.reset).toLocaleString()}`));
    }
@@ -83,13 +87,18 @@ function updateView(){
  for(const chip of $('compact').children)chip.setAttribute('aria-expanded',String(chip.dataset.account===selected&&!current?.settings));
 }
 function showDetail(id){clearTimeout(timer);if(current?.settings||selected===id)return;selected=id;isExpanded=true;updateView();window.notch.detail(id);}
-function expand(){clearTimeout(timer);if(isExpanded)return;isExpanded=true;updateView();window.notch.expand(true);}
-function collapse(){if(current?.settings||current?.visibility==='always')return;selected=null;isExpanded=false;updateView();window.notch.expand(false);}
+function expand(){clearTimeout(timer);if(current?.alerting){window.notch.expand(true);return;}if(isExpanded)return;isExpanded=true;updateView();window.notch.expand(true);}
+function collapse(){if(current?.settings||current?.visibility==='always')return;
+ // During an alert the notch stays out; only the hover state is handed back for when it ends.
+ if(current?.alerting){selected=null;updateView();window.notch.expand(false);return;}
+ selected=null;isExpanded=false;updateView();window.notch.expand(false);}
 $('settings').onmouseenter=()=>{if(!current?.settings&&selected!==null){selected=null;updateView();window.notch.detail(null);}};
 $('settings').onclick=()=>{clearTimeout(timer);window.notch.settings();};
 $('retry').onclick=()=>window.notch.retry();
 $('position').onchange=e=>window.notch.position(e.target.value);
 $('visibility').onchange=e=>window.notch.visibility(e.target.value);
+$('alerts').onchange=e=>window.notch.alerts({enabled:e.target.checked});
+$('alert-seconds').onchange=e=>window.notch.alerts({seconds:Number(e.target.value)});
 $('startup').onchange=e=>window.notch.startup(e.target.checked).catch(()=>{$('startup-status').textContent='Windows could not change startup settings. Try again.';});
 document.body.onmouseenter=expand;
 document.body.onmouseleave=()=>{clearTimeout(timer);timer=setTimeout(collapse,350);};

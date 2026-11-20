@@ -85,6 +85,19 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
+                Toggle("Alert when a limit reaches 90%", isOn: $preferences.usageAlertsEnabled)
+
+                Stepper(value: $preferences.usageAlertSeconds,
+                        in: Preferences.alertSecondsRange) {
+                    Text("Keep the alert on screen for \(preferences.usageAlertSeconds) s")
+                }
+                .disabled(!preferences.usageAlertsEnabled)
+
+                Text("The notch comes out on its own, even when it is folded or hidden, and shows the usage in its warning colours. It then goes back to how Show is set.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
                 Picker("Edge", selection: $preferences.notchEdge) {
                     ForEach(NotchEdge.allCases) { Text($0.title).tag($0) }
                 }

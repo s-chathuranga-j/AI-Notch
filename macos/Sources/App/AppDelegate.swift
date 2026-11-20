@@ -143,13 +143,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .sink { [weak store] in store?.disconnected = $0 }
                 .store(in: &cancellables)
 
+            var alerts = UsageAlertTracker()
             store.$snapshots
                 .receive(on: RunLoop.main)
                 .sink { [weak controller] snapshots in
+                    let shown = isDemo ? Fixtures.snapshots() : snapshots
                     withAnimation(NotchMotion.unfold) {
-                        controller?.model.snapshots = isDemo ? Fixtures.snapshots() : snapshots
+                        controller?.model.snapshots = shown
                     }
                     controller?.model.now = Date()
+                    // Fed on every reading, alerts on or off, so switching them
+                    // on later does not announce a limit that was crossed long ago.
+                    let crossed = alerts.newAlerts(in: shown)
+                    if !crossed.isEmpty, preferences.usageAlertsEnabled {
+                        controller?.announceUsageAlert(
+                            duration: TimeInterval(preferences.usageAlertSeconds)
+                        )
+                    }
                 }
                 .store(in: &cancellables)
             if isDemo { controller.model.snapshots = Fixtures.snapshots() }

@@ -33,6 +33,11 @@ final class NotchViewModel: ObservableObject {
 
     /// Held open, by either route. What the folding logic actually asks.
     var staysOpen: Bool { isPinned || isAlwaysOn }
+
+    /// Held open for a moment because a limit has nearly run out. Not part of
+    /// `staysOpen`: that is what "Keep open" reports, and an alert is neither
+    /// a click nor a setting — it lets go on its own.
+    @Published var isAlerting = false
     /// Providers with a fetch in flight, driven by the store.
     @Published var refreshing: Set<String> = []
     /// The settings handle is under the cursor.

@@ -70,3 +70,13 @@ body:is([data-position=left],[data-position=right]) .heading{border-top:0;paddin
 body[data-position=right] #settings::before{transform:rotate(90deg)}
 body[data-position=bottom] #settings::before{transform:rotate(-90deg)}
 @media(prefers-reduced-motion:reduce){#settings svg,#settings::before{transition:none}}
+.subscription-chip.level-warning{color:#f0b849;--accent:#f0b849}
+.subscription-chip.level-critical{color:#ff5f57;--accent:#ff5f57}
+.meter.level-warning{--accent:#f0b849}
+.meter.level-critical{--accent:#ff5f57}
+.alerting .subscription-chip.level-warning .usage-ring,.alerting .subscription-chip.level-critical .usage-ring{animation:alert-pulse 1.2s ease-in-out 3}
+@keyframes alert-pulse{50%{filter:drop-shadow(0 0 6px var(--accent))}}
+@media (prefers-reduced-motion:reduce){.alerting .usage-ring{animation:none!important}}
+#alert-seconds{width:4.5em;font:inherit;padding:5px 8px;margin-right:6px;border:1px solid #ffffff25;border-radius:8px;background:#252932;color:#e6eaf2}
+#alert-seconds:disabled{opacity:.5}
+.hint{display:block;color:#a4adbe;font-size:11px;margin:-2px 0 6px}
