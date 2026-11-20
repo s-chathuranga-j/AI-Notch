@@ -47,6 +47,145 @@ final class UsageAlertTests: XCTestCase {
         XCTAssertEqual(tracker.newAlerts(in: [snapshot("claude", session: 0.96)]), [])
     }
 
+    private func crossed(_ tracker: inout UsageAlertTracker, _ snapshots: [ProviderSnapshot],
+                         _ levels: Set<Int> = [90]) -> [Int] {
+        tracker.update(snapshots, thresholds: levels).crossed.map(\.threshold)
+    }
+
+    func testEachChosenThresholdAlertsAsItIsCrossed() {
+        var tracker = UsageAlertTracker()
+        let levels: Set<Int> = [75, 90, 100]
+        XCTAssertEqual(crossed(&tracker, [snapshot("c", session: 0.76)], levels), [75])
+        XCTAssertEqual(crossed(&tracker, [snapshot("c", session: 0.80)], levels), [])
+        // Jumping past two reports the highest.
+        XCTAssertEqual(crossed(&tracker, [snapshot("c", session: 1.0)], levels), [100])
+    }
+
+    func testAResetIsReportedOnceAndReArms() {
+        var tracker = UsageAlertTracker()
+        _ = tracker.update([snapshot("claude", session: 0.93)])
+        let reset = tracker.update([snapshot("claude", session: 0.04)])
+        XCTAssertEqual(reset.crossed, [])
+        XCTAssertEqual(reset.recovered.map(\.label), ["Session"])
+        XCTAssertEqual(tracker.update([snapshot("claude", session: 0.03)]).recovered, [], "only once")
+        XCTAssertEqual(crossed(&tracker, [snapshot("claude", session: 0.91)]), [90])
+    }
+
+    func testAWindowThatNeverAlertedDoesNotAnnounceAReset() {
+        var tracker = UsageAlertTracker()
+        _ = tracker.update([snapshot("c", session: 0.6)])
+        XCTAssertEqual(tracker.update([snapshot("c", session: 0.02)]).recovered, [])
+    }
+
+    func testEasingBelowTheThresholdIsNotAReset() {
+        var tracker = UsageAlertTracker()
+        _ = tracker.update([snapshot("c", session: 0.92)])
+        XCTAssertEqual(tracker.update([snapshot("c", session: 0.85)]).recovered, [])
+    }
+
+    func testProvidersAreTrackedIndependentlyAndCanBeForgotten() {
+        var tracker = UsageAlertTracker()
+        XCTAssertEqual(tracker.newAlerts(in: [snapshot("claude", session: 0.95)]), ["claude"])
+        XCTAssertEqual(tracker.newAlerts(in: [snapshot("claude-work", session: 0.95)]), ["claude-work"])
+        tracker.forget(providerID: "claude")
+        XCTAssertEqual(tracker.newAlerts(in: [snapshot("claude", session: 0.95)]), ["claude"])
+        XCTAssertEqual(tracker.newAlerts(in: [snapshot("claude-work", session: 0.95)]), [])
+    }
+
+    func testAPaceWarningFiresOnceWhenTheWindowRunsOutBeforeTheResetWithinTheHour() {
+        var tracker = UsageAlertTracker()
+        let now = Date(timeIntervalSince1970: 1_000_000_000)
+        let soon = UsageForecast(eta: now.addingTimeInterval(30 * 60), beforeReset: true, perHour: 20)
+        func pace(_ used: Double, _ forecast: UsageForecast) -> Bool {
+            tracker.pace(providerID: "c", windowID: "session", usedFraction: used,
+                         forecast: forecast, now: now)
+        }
+        XCTAssertFalse(pace(0.4, soon), "too little used yet")
+        XCTAssertFalse(pace(0.6, UsageForecast(eta: soon.eta, beforeReset: false, perHour: 20)))
+        XCTAssertFalse(pace(0.6, UsageForecast(eta: now.addingTimeInterval(3 * 3600),
+                                               beforeReset: true, perHour: 20)))
+        XCTAssertTrue(pace(0.6, soon))
+        XCTAssertFalse(pace(0.7, soon))
+        _ = tracker.update([snapshot("c", session: 0.05)])
+        XCTAssertTrue(pace(0.6, soon), "re-armed after a reset")
+    }
+
+    func testNoticesPreferALimitThenPaceThenReset() {
+        var tracker = UsageAlertTracker()
+        let now = Date(timeIntervalSince1970: 1_000_000_000)
+        let soon = UsageForecast(eta: now.addingTimeInterval(20 * 60), beforeReset: true, perHour: 30)
+        let forecasts = ["claude": ["session": soon]]
+
+        let limit = tracker.notices(for: [snapshot("claude", session: 0.92)],
+                                    paceAlerts: true, forecasts: forecasts, now: now)
+        XCTAssertEqual(limit.map(\.kind), [.limit], "a crossing beats the pace")
+
+        let reset = tracker.notices(for: [snapshot("claude", session: 0.1)],
+                                    paceAlerts: true, forecasts: [:], now: now)
+        XCTAssertEqual(reset.map(\.kind), [.reset])
+        XCTAssertEqual(reset.first?.title, "claude is back")
+
+        let pace = tracker.notices(for: [snapshot("claude", session: 0.6)],
+                                   paceAlerts: true, forecasts: forecasts, now: now)
+        XCTAssertEqual(pace.map(\.kind), [.pace])
+        XCTAssertEqual(tracker.notices(for: [snapshot("claude", session: 0.62)],
+                                       paceAlerts: true, forecasts: forecasts, now: now), [])
+
+        var off = UsageAlertTracker()
+        XCTAssertEqual(off.notices(for: [snapshot("claude", session: 0.6)],
+                                   paceAlerts: false, forecasts: forecasts, now: now), [])
+    }
+
+    func testThresholdsAreCleaned() {
+        XCTAssertEqual(UsageAlertTracker.clean([100, 75, 42]), [75, 100])
+        XCTAssertEqual(UsageAlertTracker.clean([]), [90])
+    }
+
+    func testQuietHoursIncludingOnesThatWrapMidnight() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        func at(_ h: Int, _ m: Int = 0) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 1, day: 1, hour: h, minute: m))!
+        }
+        let night = QuietHours(isEnabled: true, start: QuietHours.minutes("22:00")!,
+                               end: QuietHours.minutes("07:30")!)
+        XCTAssertTrue(night.contains(at(23), calendar: calendar))
+        XCTAssertTrue(night.contains(at(3), calendar: calendar))
+        XCTAssertFalse(night.contains(at(7, 30), calendar: calendar))
+        XCTAssertFalse(night.contains(at(12), calendar: calendar))
+        XCTAssertTrue(QuietHours(isEnabled: true, start: 12 * 60, end: 13 * 60)
+            .contains(at(12, 15), calendar: calendar))
+        var off = night
+        off.isEnabled = false
+        XCTAssertFalse(off.contains(at(23), calendar: calendar))
+        XCTAssertFalse(QuietHours(isEnabled: true, start: 600, end: 600).contains(at(10), calendar: calendar))
+        XCTAssertNil(QuietHours.minutes("9"))
+        XCTAssertNil(QuietHours.minutes("24:00"))
+        XCTAssertEqual(QuietHours.minutes("9:05"), 9 * 60 + 5)
+    }
+
+    @MainActor
+    func testAlertPreferencesPersistAndAreCleaned() {
+        let name = "UsageAlertTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        defer { defaults.removePersistentDomain(forName: name) }
+
+        let fresh = Preferences(defaults: defaults)
+        XCTAssertEqual(fresh.usageAlertThresholds, [90])
+        XCTAssertTrue(fresh.paceAlertsEnabled)
+        XCTAssertFalse(fresh.quietHoursEnabled)
+        XCTAssertFalse(fresh.systemNotificationsEnabled)
+
+        fresh.usageAlertThresholds = [75, 100, 13]
+        fresh.quietHoursEnabled = true
+        fresh.quietHoursStart = 23 * 60
+        let again = Preferences(defaults: defaults)
+        XCTAssertEqual(again.usageAlertThresholds, [75, 100])
+        XCTAssertTrue(again.quietHours.isEnabled)
+        XCTAssertEqual(again.quietHours.start, 23 * 60)
+    }
+
     func testAlertDurationIsClamped() {
         XCTAssertEqual(Preferences.clampAlertSeconds(0), Preferences.alertSecondsRange.lowerBound)
         XCTAssertEqual(Preferences.clampAlertSeconds(10), 10)

@@ -232,6 +232,7 @@ private struct LimitWindowRow: View {
     let window: LimitWindow
     let fidelity: Fidelity
     let now: Date
+    var forecast: UsageForecast?
 
     private var band: UsageBand { UsageBand.band(for: window.usedFraction ?? 0) }
     private var trackWidth: CGFloat { NotchLayout.cardWidth - 2 * NotchLayout.cardPadding }
@@ -264,13 +265,104 @@ private struct LimitWindowRow: View {
                 .font(Typography.cardBody)
                 .foregroundStyle(Palette.textPrimary)
                 .padding(.top, NotchLayout.barToUsed)
+
+            if let forecast {
+                Text(ForecastCopy.text(for: forecast, now: now))
+                    .font(Typography.cardBody)
+                    // Yellow only when it matters: running out after the reset
+                    // is a pace, not a problem.
+                    .foregroundStyle(forecast.beforeReset == true
+                                     ? Palette.watch : Palette.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .padding(.top, NotchLayout.usedToForecast)
+            }
         }
+    }
+}
+
+/// The last seven days of one window: each bar the day's highest reading,
+/// coloured as the ring would have been, under a dotted line at 90%.
+private struct DailyPeaksChart: View {
+    let peaks: [DailyPeak]
+    let label: String
+
+    private var average: Int? {
+        let known = peaks.compactMap(\.peak)
+        guard !known.isEmpty else { return nil }
+        return Int((known.reduce(0, +) / Double(known.count)).rounded())
+    }
+
+    private static let initials: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEEEE")
+        return f
+    }()
+
+    private var width: CGFloat { NotchLayout.cardWidth - 2 * NotchLayout.cardPadding }
+    private var barWidth: CGFloat {
+        let count = CGFloat(max(peaks.count, 1))
+        return (width - (count - 1) * NotchLayout.peaksBarGap) / count
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SplitRow(leading: "\(label) peak · 7 days",
+                     trailing: average.map { "avg \($0)%" } ?? "",
+                     leadingColor: Palette.textSecondary)
+
+            ZStack(alignment: .bottomLeading) {
+                // A gap day is left empty rather than drawn as zero: nothing
+                // was read, which is not the same as nothing used.
+                HStack(alignment: .bottom, spacing: NotchLayout.peaksBarGap) {
+                    ForEach(Array(peaks.enumerated()), id: \.offset) { _, day in
+                        let fraction = min(max((day.peak ?? 0) / 100, 0), 1)
+                        RoundedRectangle(cornerRadius: Design.px(4))
+                            .fill(day.peak == nil ? Color.clear
+                                  : UsageBand.band(for: fraction).color)
+                            .frame(width: barWidth,
+                                   height: day.peak == nil ? 0
+                                       : max(Design.px(4), NotchLayout.peaksBarsHeight * fraction))
+                    }
+                }
+                .frame(width: width, height: NotchLayout.peaksBarsHeight, alignment: .bottomLeading)
+
+                Path { path in
+                    let y = NotchLayout.peaksBarsHeight * 0.1
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: width, y: y))
+                }
+                .stroke(Palette.textSecondary.opacity(0.6),
+                        style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                .frame(width: width, height: NotchLayout.peaksBarsHeight)
+            }
+            .frame(width: width, height: NotchLayout.peaksBarsHeight)
+            .padding(.top, NotchLayout.peaksCaptionToBars)
+
+            HStack(spacing: NotchLayout.peaksBarGap) {
+                ForEach(Array(peaks.enumerated()), id: \.offset) { _, day in
+                    Text(Self.initials.string(from: day.day))
+                        .frame(width: barWidth)
+                }
+            }
+            .font(Typography.cardBody)
+            .foregroundStyle(Palette.textSecondary)
+            .lineLimit(1)
+            .padding(.top, NotchLayout.peaksBarsToDays)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) daily peaks: " + peaks.map { day in
+            "\(Self.initials.string(from: day.day)) "
+                + (day.peak.map { "\(Int($0.rounded()))%" } ?? "no data")
+        }.joined(separator: ", "))
     }
 }
 
 private struct ProviderTooltip: View {
     let snapshot: ProviderSnapshot
     let now: Date
+    var insights: ProviderInsights?
+    var content: NotchLayout.CardContent?
 
     /// Only worth saying when the numbers are not current. A remembered reading
     /// has to be dated, or it quietly passes itself off as live.
@@ -301,8 +393,14 @@ private struct ProviderTooltip: View {
                     .padding(.top, NotchLayout.headerToBlock)
             } else {
                 ForEach(Array(snapshot.windows.enumerated()), id: \.element.id) { index, window in
-                    LimitWindowRow(window: window, fidelity: snapshot.fidelity, now: now)
+                    LimitWindowRow(window: window, fidelity: snapshot.fidelity, now: now,
+                                   forecast: content?.forecastIDs.contains(window.id) == true
+                                       ? insights?.forecasts[window.id] : nil)
                         .padding(.top, index == 0 ? NotchLayout.headerToBlock : NotchLayout.blockSpacing)
+                }
+                if content?.showsPeaks == true, let peaks = insights?.peaks {
+                    DailyPeaksChart(peaks: peaks, label: insights?.peaksLabel ?? "")
+                        .padding(.top, NotchLayout.blockSpacing)
                 }
             }
         }
@@ -433,28 +531,28 @@ struct TooltipCard: View {
     /// How many sessions this screen has room to list. Solved from the display
     /// rather than fixed, so a big screen hides nothing.
     var sessionCap: Int = NotchLayout.defaultSessionCap
+    /// The pace forecasts and daily peaks, where the history has any.
+    var insights: ProviderInsights?
 
     /// The same figure the hover region uses, so what is drawn and what is
     /// reachable can never drift apart.
-    private var height: CGFloat {
-        NotchLayout.cardHeight(
-            windowCount: snapshot.statusMessage == nil ? snapshot.windows.count : 0,
-            sessionCount: activity?.sessions.count ?? 0,
-            sessionCap: sessionCap,
-            statusMessage: snapshot.statusMessage,
-            blockMessage: snapshot.block?.summary(now: now)
-        )
+    private var content: NotchLayout.CardContent {
+        NotchLayout.cardContent(for: snapshot, insights: insights,
+                                sessionCount: activity?.sessions.count ?? 0,
+                                sessionCap: sessionCap, now: now)
     }
 
     var body: some View {
-        TooltipShell(height: height, direction: direction) {
+        let card = content
+        TooltipShell(height: card.height, direction: direction) {
             // Stacked, not replaced in place: during a swap both sets of rows
             // exist for a moment, and in a ZStack they overlap and dissolve
             // instead of shoving each other around. Top-aligned so neither
             // drifts while the card resizes around them.
             ZStack(alignment: .topLeading) {
                 VStack(alignment: .leading, spacing: 0) {
-                    ProviderTooltip(snapshot: snapshot, now: now)
+                    ProviderTooltip(snapshot: snapshot, now: now,
+                                    insights: insights, content: card)
                     if let activity {
                         SessionList(summary: activity, now: now, cap: sessionCap)
                     }

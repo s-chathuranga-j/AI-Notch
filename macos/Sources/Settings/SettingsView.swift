@@ -21,6 +21,36 @@ struct SettingsView: View {
     let retry: (String) -> Void
     @ObservedObject var updater: Updater
 
+    /// One checkbox per level. The last one cannot be cleared: no level at all
+    /// would mean no alerts, which is the switch above.
+    private func thresholdBinding(_ level: Int) -> Binding<Bool> {
+        Binding(
+            get: { preferences.usageAlertThresholds.contains(level) },
+            set: { on in
+                var levels = preferences.usageAlertThresholds
+                if on { levels.insert(level) } else if levels.count > 1 { levels.remove(level) }
+                preferences.usageAlertThresholds = levels
+            }
+        )
+    }
+
+    /// A time of day, stored as minutes after midnight, as the date picker
+    /// wants it: today at that time.
+    private func timeBinding(_ key: ReferenceWritableKeyPath<Preferences, Int>) -> Binding<Date> {
+        Binding(
+            get: {
+                let minutes = preferences[keyPath: key]
+                return Calendar.current.date(bySettingHour: minutes / 60, minute: minutes % 60,
+                                             second: 0, of: Date()) ?? Date()
+            },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                preferences[keyPath: key] = Preferences.clampMinutes(
+                    (parts.hour ?? 0) * 60 + (parts.minute ?? 0))
+            }
+        )
+    }
+
     var body: some View {
         // One page of grouped sections rather than tabs. Tabs hid three
         // quarters of the settings behind a click, for an app with about a
@@ -85,19 +115,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Toggle("Alert when a limit reaches 90%", isOn: $preferences.usageAlertsEnabled)
-
-                Stepper(value: $preferences.usageAlertSeconds,
-                        in: Preferences.alertSecondsRange) {
-                    Text("Keep the alert on screen for \(preferences.usageAlertSeconds) s")
-                }
-                .disabled(!preferences.usageAlertsEnabled)
-
-                Text("The notch comes out on its own, even when it is folded or hidden, and shows the usage in its warning colours. It then goes back to how Show is set.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 Picker("Edge", selection: $preferences.notchEdge) {
                     ForEach(NotchEdge.allCases) { Text($0.title).tag($0) }
                 }
@@ -116,6 +133,53 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
 
                 Text(preferences.appPresence.explanation)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Its own section now that there is more than one question to
+            // it: when to speak up, how loudly, and when to stay quiet.
+            Section("Alerts") {
+                Toggle("Bring the notch out when a limit reaches", isOn: $preferences.usageAlertsEnabled)
+
+                HStack(spacing: 16) {
+                    ForEach(UsageAlertTracker.thresholds, id: \.self) { level in
+                        Toggle("\(level)%", isOn: thresholdBinding(level))
+                            .toggleStyle(.checkbox)
+                    }
+                }
+
+                Toggle("Warn early if the pace runs out before reset", isOn: $preferences.paceAlertsEnabled)
+
+                Text("Once per limit, when the last hour or so of use would run it out before it resets, within the hour. A limit that alerted and then resets brings the notch out once more, in green.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Stepper(value: $preferences.usageAlertSeconds,
+                        in: Preferences.alertSecondsRange) {
+                    Text("Keep the alert on screen for \(preferences.usageAlertSeconds) s")
+                }
+                .disabled(!preferences.usageAlertsEnabled)
+
+                Text("The notch comes out on its own, even when it is folded or hidden, and shows the usage in its warning colours. It then goes back to how Show is set.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Toggle("Also show notifications", isOn: $preferences.systemNotificationsEnabled)
+
+                Toggle("Quiet hours", isOn: $preferences.quietHoursEnabled)
+                HStack {
+                    DatePicker("From", selection: timeBinding(\.quietHoursStart),
+                               displayedComponents: .hourAndMinute)
+                    DatePicker("to", selection: timeBinding(\.quietHoursEnd),
+                               displayedComponents: .hourAndMinute)
+                }
+                .disabled(!preferences.quietHoursEnabled)
+
+                Text("No alerts or notifications during these hours. They may cross midnight.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

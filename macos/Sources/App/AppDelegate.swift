@@ -13,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Held for the life of the app: releasing it stops the scheduled checks.
     private var updater: Updater?
     private var statusItem: StatusItemController?
+    private var watch: UsageWatch?
+    private var notifier: SystemNotifier?
     private var cancellables = Set<AnyCancellable>()
 
     /// The unit bundle is hosted by this app, so `xcodebuild test` launches it
@@ -143,7 +145,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .sink { [weak store] in store?.disconnected = $0 }
                 .store(in: &cancellables)
 
-            var alerts = UsageAlertTracker()
+            // The demo never touches the real history file.
+            let watch = UsageWatch(file: isDemo ? nil : UsageHistoryFile.standard)
+            self.watch = watch
+            let notifier = SystemNotifier()
+            self.notifier = notifier
+
+            preferences.$systemNotificationsEnabled
+                .dropFirst()
+                .filter { $0 }
+                .sink { _ in notifier.requestAuthorization() }
+                .store(in: &cancellables)
+
+            preferences.$disconnectedProviders
+                .sink { watch.forget(providerIDs: $0) }
+                .store(in: &cancellables)
+
             store.$snapshots
                 .receive(on: RunLoop.main)
                 .sink { [weak controller] snapshots in
@@ -151,13 +168,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     withAnimation(NotchMotion.unfold) {
                         controller?.model.snapshots = shown
                     }
-                    controller?.model.now = Date()
+                    let now = Date()
+                    controller?.model.now = now
                     // Fed on every reading, alerts on or off, so switching them
                     // on later does not announce a limit that was crossed long ago.
-                    let crossed = alerts.newAlerts(in: shown)
-                    if !crossed.isEmpty, preferences.usageAlertsEnabled {
+                    let (insights, notices) = watch.receive(
+                        shown, record: !isDemo,
+                        thresholds: preferences.usageAlertThresholds,
+                        paceAlerts: preferences.paceAlertsEnabled, now: now
+                    )
+                    controller?.model.insights = insights
+                    guard !notices.isEmpty, !preferences.quietHours.contains(now) else { return }
+                    if preferences.systemNotificationsEnabled {
+                        for notice in notices { notifier.post(notice) }
+                    }
+                    if preferences.usageAlertsEnabled {
                         controller?.announceUsageAlert(
-                            duration: TimeInterval(preferences.usageAlertSeconds)
+                            duration: TimeInterval(preferences.usageAlertSeconds),
+                            notices: Set(notices.filter { $0.kind == .reset }.map(\.providerID)),
+                            warnings: Set(notices.filter { $0.kind != .reset }.map(\.providerID))
                         )
                     }
                 }
@@ -234,6 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         store?.stop()
+        watch?.saveNow()
         activityController?.stop()
         notchController?.stop()
     }

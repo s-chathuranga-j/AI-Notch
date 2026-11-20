@@ -38,6 +38,21 @@ final class NotchViewModel: ObservableObject {
     /// `staysOpen`: that is what "Keep open" reports, and an alert is neither
     /// a click nor a setting — it lets go on its own.
     @Published var isAlerting = false
+    /// Providers whose alert is good news — a limit that came back. Their
+    /// rings go green while the alert lasts, so a notch coming out to say
+    /// "you can carry on" does not look like one saying "stop".
+    @Published var noticeIDs: Set<String> = []
+    /// Pace forecasts and daily peaks per provider, worked out from the
+    /// history each time a reading lands.
+    @Published var insights: [String: ProviderInsights] = [:]
+
+    /// What a provider's card shows and how tall it is. The card, the panel
+    /// that centres it and the region that keeps it open all ask this.
+    func cardContent(for snapshot: ProviderSnapshot) -> NotchLayout.CardContent {
+        NotchLayout.cardContent(for: snapshot, insights: insights[snapshot.id],
+                                sessionCount: activity(for: snapshot.id)?.sessions.count ?? 0,
+                                sessionCap: sessionCap, now: now)
+    }
     /// Providers with a fetch in flight, driven by the store.
     @Published var refreshing: Set<String> = []
     /// The settings handle is under the cursor.

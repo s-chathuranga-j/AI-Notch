@@ -43,7 +43,8 @@ struct NotchRootView: View {
                         activity: model.activity(for: snapshot.id),
                         now: model.now,
                         direction: model.edge.tooltipDirection,
-                        sessionCap: model.sessionCap
+                        sessionCap: model.sessionCap,
+                        insights: model.insights[snapshot.id]
                     )
                         // Deliberately *no* `.id` here: the card is one object
                         // that travels and resizes between cells, which reads
@@ -105,7 +106,8 @@ struct NotchRootView: View {
             ProviderCell(
                 snapshot: snapshot,
                 activity: model.activity(for: snapshot.id),
-                isRefreshing: model.refreshing.contains(snapshot.id)
+                isRefreshing: model.refreshing.contains(snapshot.id),
+                isNotice: model.isAlerting && model.noticeIDs.contains(snapshot.id)
             )
                 // Pinned to what the cell claims along the stack, or the drawn
                 // rings stop lining up with the centres `ringCenter` hands to
@@ -188,13 +190,7 @@ struct NotchRootView: View {
     ) -> CGPoint {
         let card = model.edge.isVertical
             ? NotchLayout.cardWidth
-            : NotchLayout.cardHeight(
-                windowCount: snapshot.windows.count,
-                sessionCount: model.activity(for: snapshot.id)?.sessions.count ?? 0,
-                sessionCap: model.sessionCap,
-                statusMessage: snapshot.statusMessage,
-                blockMessage: snapshot.block?.summary(now: model.now)
-            )
+            : model.cardContent(for: snapshot).height
         return place.point(
             along: model.slack + model.ringCenter(index: index),
             across: model.tooltipInset + (NotchLayout.tailLength + card) / 2

@@ -20,7 +20,7 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(notchVisibility.rawValue, forKey: Keys.visibility) }
     }
 
-    /// Whether the notch comes out on its own when a limit reaches 90%.
+    /// Whether the notch comes out on its own when a limit reaches a chosen level.
     @Published var usageAlertsEnabled: Bool {
         didSet { defaults.set(usageAlertsEnabled, forKey: Keys.alerts) }
     }
@@ -37,11 +37,54 @@ final class Preferences: ObservableObject {
         }
     }
 
+    /// The levels, in percent, at which a limit brings the notch out. Several
+    /// can be chosen, so a 75% heads-up does not cost the 90% one.
+    @Published var usageAlertThresholds: Set<Int> {
+        didSet {
+            let clean = Set(UsageAlertTracker.clean(usageAlertThresholds))
+            if clean != usageAlertThresholds { usageAlertThresholds = clean }
+            defaults.set(usageAlertThresholds.sorted(), forKey: Keys.alertThresholds)
+        }
+    }
+
+    /// Warn once per window when the recent pace runs out before the reset.
+    @Published var paceAlertsEnabled: Bool {
+        didSet { defaults.set(paceAlertsEnabled, forKey: Keys.paceAlerts) }
+    }
+
+    /// Hours in which alerts stay quiet.
+    @Published var quietHoursEnabled: Bool {
+        didSet { defaults.set(quietHoursEnabled, forKey: Keys.quietEnabled) }
+    }
+
+    /// Minutes after midnight.
+    @Published var quietHoursStart: Int {
+        didSet { defaults.set(quietHoursStart, forKey: Keys.quietStart) }
+    }
+
+    @Published var quietHoursEnd: Int {
+        didSet { defaults.set(quietHoursEnd, forKey: Keys.quietEnd) }
+    }
+
+    var quietHours: QuietHours {
+        QuietHours(isEnabled: quietHoursEnabled, start: quietHoursStart, end: quietHoursEnd)
+    }
+
+    /// Post a macOS notification as well as bringing the notch out — for when
+    /// you are looking at another screen.
+    @Published var systemNotificationsEnabled: Bool {
+        didSet { defaults.set(systemNotificationsEnabled, forKey: Keys.notifications) }
+    }
+
     nonisolated static let alertSecondsRange = 3...60
     nonisolated static let defaultAlertSeconds = 10
 
     nonisolated static func clampAlertSeconds(_ value: Int) -> Int {
         min(max(value, alertSecondsRange.lowerBound), alertSecondsRange.upperBound)
+    }
+
+    nonisolated static func clampMinutes(_ value: Int) -> Int {
+        min(max(value, 0), 24 * 60 - 1)
     }
 
     /// Which screen edge the notch is welded to.
@@ -85,6 +128,12 @@ final class Preferences: ObservableObject {
         static let lastSeenVersion = "lastSeenVersion"
         static let alerts = "usageAlertsEnabled"
         static let alertSeconds = "usageAlertSeconds"
+        static let alertThresholds = "usageAlertThresholds"
+        static let paceAlerts = "paceAlertsEnabled"
+        static let quietEnabled = "quietHoursEnabled"
+        static let quietStart = "quietHoursStart"
+        static let quietEnd = "quietHoursEnd"
+        static let notifications = "systemNotificationsEnabled"
     }
 
     /// True the very first time this copy runs, and never again.
@@ -143,6 +192,20 @@ final class Preferences: ObservableObject {
         self.usageAlertSeconds = Self.clampAlertSeconds(
             defaults.object(forKey: Keys.alertSeconds) as? Int ?? Self.defaultAlertSeconds
         )
+        self.usageAlertThresholds = Set(UsageAlertTracker.clean(
+            Set(defaults.array(forKey: Keys.alertThresholds) as? [Int] ?? [])
+        ))
+        // On, like the alerts themselves: it only ever speaks once per window,
+        // and only when the limit would otherwise run out before the reset.
+        self.paceAlertsEnabled = defaults.object(forKey: Keys.paceAlerts) as? Bool ?? true
+        self.quietHoursEnabled = defaults.bool(forKey: Keys.quietEnabled)
+        self.quietHoursStart = Self.clampMinutes(
+            defaults.object(forKey: Keys.quietStart) as? Int ?? QuietHours.defaultStart)
+        self.quietHoursEnd = Self.clampMinutes(
+            defaults.object(forKey: Keys.quietEnd) as? Int ?? QuietHours.defaultEnd)
+        // Off until asked for: turning it on is what prompts macOS for
+        // permission, and a prompt nobody asked for is one people refuse.
+        self.systemNotificationsEnabled = defaults.bool(forKey: Keys.notifications)
         // Absent means never chosen. The Dock is the default because it is the
         // findable one — a new user who cannot see the app anywhere has no way
         // to learn it is running.
@@ -189,6 +252,8 @@ final class Preferences: ObservableObject {
 
         let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
         for relative in ["Caches/\(bundleID)",
+                         // The usage history: percentages and times only, but still yours.
+                         "Application Support/\(bundleID)",
                          "WebKit/\(bundleID)",
                          "HTTPStorages/\(bundleID)",
                          "HTTPStorages/\(bundleID).binarycookies",
