@@ -1,14 +1,22 @@
 # AI Notch for Windows v0.3.8 — Preview
 
-AI Notch now tells you when a limit is about to run out.
+AI Notch now tells you when a limit is about to run out, and when it is back.
 
-- **Usage alerts.** When any limit reaches 90%, the notch comes out on its own, even in On hover or Hidden mode. The account shows in yellow, or red at 100%. The notch stays out for the number of seconds you choose (default 10, 3–60), then returns to your visibility setting. Each crossing alerts once and re-arms after the limit resets. Turn alerts off with **Alert at 90% usage** in Settings.
-- **A tidier notch.** Details and settings stay clear of the notch's curved edges on every screen edge, including while scrolling. The ring row is centred, the left and right rails are evenly spaced, and on side edges the details card sits beside the ring you hover.
-- **A visible settings gear.** The settings button now always shows a gear instead of a partial arc.
+- **Usage alerts.** When a limit crosses a level you choose (75%, 90% or 100%), the notch comes out on its own, even in On hover or Hidden mode, then returns to your visibility setting after the number of seconds you choose (default 10). Usage shows yellow from 90% and red at 100%.
+- **Pace warnings.** Account details show when a limit will run out at the current pace (“At this pace: runs out around 3:40 PM, before it resets”). If that is before the reset and within the hour, the notch comes out early.
+- **Back in green.** When a limit that alerted resets, the notch comes out once more with that account in green.
+- **Quiet hours and notifications.** Hold alerts back during quiet hours (a limit still high afterwards is announced then), and optionally show a Windows notification as well.
+- **Seven-day chart.** Account details show the highest reading for each of the last seven days.
+- **Your ring, your choice.** Each account can show its first limit, a specific limit, or whichever is closest to running out.
+- **Peek from anywhere.** Press Ctrl+Alt+N (changeable or off), or choose Peek at usage in the tray, to show the notch for a moment.
+- **Pick a display.** Place the notch on any connected monitor.
+- **A tidier notch.** Content stays clear of the curved edges on every screen edge, rings are centred, side rails are evenly spaced, and the settings button is always a visible gear.
+
+For the forecast and chart, AI Notch keeps a local history of usage percentages and timestamps only, pruned after eight days and deleted when an account is disabled.
 
 The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs and SHA-256 checksums are included. This is an unsigned preview.
 
-All 60 tests passed. Native installer execution and live alerts on Windows remain unverified.
+All 83 tests passed. Native installer execution and live alerts, notifications and shortcuts on Windows remain unverified.
 
 ## Earlier release: Windows v0.3.7
 

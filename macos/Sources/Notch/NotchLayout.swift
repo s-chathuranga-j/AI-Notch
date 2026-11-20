@@ -137,6 +137,13 @@ enum NotchLayout {
     static let statusDotStroke = Design.px(3.4)
     static let statusDotGap    = Design.px(11)
     static let hairline      = Design.px(2.5)  // rule above the session list
+    /// The pace forecast's line, under the percentage it extends.
+    static let usedToForecast = Design.px(10)
+    /// The seven-day chart: a caption, the bars, then the day initials.
+    static let peaksBarsHeight = Design.px(84)
+    static let peaksCaptionToBars = Design.px(12)
+    static let peaksBarsToDays = Design.px(8)
+    static let peaksBarGap = Design.px(14)
 
     /// The percent label's line box. Fixed rather than intrinsic so the panel
     /// geometry can be worked out in AppKit before SwiftUI lays anything out.
@@ -274,7 +281,9 @@ enum NotchLayout {
     static func cardHeight(windowCount: Int, sessionCount: Int = 0,
                            sessionCap: Int = defaultSessionCap,
                            statusMessage: String? = nil,
-                           blockMessage: String? = nil) -> CGFloat {
+                           blockMessage: String? = nil,
+                           forecastCount: Int = 0,
+                           showsPeaks: Bool = false) -> CGFloat {
         let header = max(glyphSize, cardTitleLineHeight)
         var height = 2 * cardPadding + header
 
@@ -289,6 +298,8 @@ enum NotchLayout {
             height += headerToBlock
                 + CGFloat(windowCount) * block
                 + CGFloat(windowCount - 1) * blockSpacing
+                + CGFloat(min(forecastCount, windowCount)) * forecastLineHeight
+            if showsPeaks { height += peaksChartHeight }
         } else {
             // The status message, at whatever height it actually wraps to.
             height += headerToBlock + bodyTextHeight(statusMessage ?? "")
@@ -308,6 +319,57 @@ enum NotchLayout {
         return height
     }
 
+    /// One "At this pace" line, with the gap above it.
+    static var forecastLineHeight: CGFloat { usedToForecast + cardBodyLineHeight }
+
+    /// The seven-day chart under the windows, with the gap above it.
+    static var peaksChartHeight: CGFloat {
+        blockSpacing + cardBodyLineHeight + peaksCaptionToBars + peaksBarsHeight
+            + peaksBarsToDays + cardBodyLineHeight
+    }
+
+    /// What a provider's tooltip shows beyond the reading itself, and how tall
+    /// that makes it.
+    struct CardContent: Equatable {
+        /// Windows whose pace forecast is drawn.
+        var forecastIDs: Set<String> = []
+        var showsPeaks = false
+        var height: CGFloat
+    }
+
+    /// The one place that decides a provider card's contents and height, so the
+    /// card that is drawn, the panel that centres it and the region that keeps
+    /// it open can never disagree.
+    ///
+    /// The forecasts and the chart are extras: they are drawn only while the
+    /// card still fits the budget the panel was sized for. The panel is sized
+    /// for the worst card — four windows and as many sessions as fit — and
+    /// growing that worst case would cost a row of sessions on a small laptop
+    /// for a line most cards have room for anyway. So on a crowded card the
+    /// chart goes first, then the forecasts; the reading and the sessions never
+    /// do.
+    static func cardContent(for snapshot: ProviderSnapshot,
+                            insights: ProviderInsights?,
+                            sessionCount: Int,
+                            sessionCap: Int = defaultSessionCap,
+                            now: Date) -> CardContent {
+        let windows = snapshot.statusMessage == nil ? snapshot.windows : []
+        let block = snapshot.block?.summary(now: now)
+        func height(_ forecasts: Int, _ peaks: Bool) -> CGFloat {
+            cardHeight(windowCount: windows.count, sessionCount: sessionCount,
+                       sessionCap: sessionCap, statusMessage: snapshot.statusMessage,
+                       blockMessage: block, forecastCount: forecasts, showsPeaks: peaks)
+        }
+        let forecastIDs = Set(windows.map(\.id).filter { insights?.forecasts[$0] != nil })
+        let peaks = !windows.isEmpty && insights?.peaks != nil
+        let budget = maxCardHeight(sessionCap: sessionCap)
+
+        for (ids, chart) in [(forecastIDs, peaks), (forecastIDs, false)] {
+            let h = height(ids.count, chart)
+            if h <= budget { return CardContent(forecastIDs: ids, showsPeaks: chart, height: h) }
+        }
+        return CardContent(height: height(0, false))
+    }
 
     /// Room at each end of the stack: enough for the settings orb to hang past
     /// the foot of the shape, and enough for a tooltip anchored to the first or

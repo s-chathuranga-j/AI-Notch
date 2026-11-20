@@ -12,6 +12,7 @@ async function boot(t,options={}){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ainotch-life-'));
  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  fs.writeFileSync(path.join(directory,'settings.json'),JSON.stringify({enabled:options.enabled||[],position:'right',visibility:options.visibility||'onHover',...options.saved}));
+ if(options.history)fs.writeFileSync(path.join(directory,'history.json'),JSON.stringify(options.history));
  const app=new EventEmitter(),ipc=new EventEmitter(),power=new EventEmitter(),screen=new EventEmitter(),processMock=new EventEmitter();
  const windows=[],trays=[],handlers=new Map(),ready=[],timers=new Map(),intervals=new Map(),exits=[],relaunches=[],dialogs=[],loginWrites=[];
  let nextTimer=0,approved=options.approved!==false,registered=!!options.registered;
@@ -46,9 +47,13 @@ async function boot(t,options={}){
  }
  class Tray extends EventEmitter{constructor(){super();trays.push(this);}setToolTip(){}setContextMenu(menu){this.menu=menu;}}
  ipc.handle=(name,callback)=>handlers.set(name,callback);
- screen.getPrimaryDisplay=()=>({workArea:{x:0,y:0,width:1920,height:1040}});
+ screen.getPrimaryDisplay=()=>({id:1,workArea:{x:0,y:0,width:1920,height:1040}});
  Object.assign(processMock,{platform:options.platform||'win32',argv:['AI Notch.exe',...(options.args||[])],execPath:'C:\\Users\\Example\\AppData\\Local\\Programs\\AI Notch\\AI Notch.exe'});
- const electron={app,ipcMain:ipc,powerMonitor:power,screen,BrowserWindow:Window,Tray,Menu:{buildFromTemplate:items=>items},session:{defaultSession:{webRequest:{onBeforeRequest(){}}}},dialog:{showErrorBox:(...args)=>dialogs.push(args)}};
+ const shortcuts=new Map(),notifications=[];
+ const globalShortcut={register:(key,fn)=>{if(options.shortcutTaken)return false;shortcuts.set(key,fn);return true;},unregisterAll:()=>shortcuts.clear()};
+ class Notification{static isSupported(){return true;}constructor(o){this.o=o;}show(){notifications.push(this.o);}}
+ if(options.displays)screen.getAllDisplays=()=>options.displays;
+ const electron={app,ipcMain:ipc,powerMonitor:power,screen,BrowserWindow:Window,Tray,Menu:{buildFromTemplate:items=>items},session:{defaultSession:{webRequest:{onBeforeRequest(){}}}},dialog:{showErrorBox:(...args)=>dialogs.push(args)},globalShortcut,Notification};
  const context={
   require:name=>name==='electron'?electron:name==='./providers.cjs'?{Poller,discover:async()=>{if(options.discoveryFails)throw new Error('Bearer synthetic-secret');return [{id:'claude',kind:'claude',label:'Claude',dir:'/synthetic'}];},fetchUsage:async()=>options.usage?options.usage():[]}:name.startsWith('./')?require('../src/'+name.slice(2)):require(name),
   process:processMock,__dirname:path.dirname(require.resolve('../src/main.cjs')),
@@ -58,7 +63,7 @@ async function boot(t,options={}){
  vm.runInNewContext(fs.readFileSync(require.resolve('../src/main.cjs'),'utf8'),context);
  await ready[0]?.catch(()=>{});await Promise.resolve();
  const event=()=>({sender:windows.at(-1).webContents,senderFrame:windows.at(-1).webContents.mainFrame});
- return {app,ipc,power,screen,windows,trays,exits,relaunches,dialogs,loginWrites,processMock,directory,ready,
+ return {shortcuts,notifications,app,ipc,power,screen,windows,trays,exits,relaunches,dialogs,loginWrites,processMock,directory,ready,
   state:()=>windows.at(-1).webContents.sent.at(-1),
   invoke:(name,...args)=>handlers.get(name)(event(),...args),
   invokeInvalid:(name,...args)=>handlers.get(name)({sender:windows.at(-1).webContents,senderFrame:{}},...args),
@@ -151,7 +156,7 @@ test('settings writes remain readable and preserve the existing account choices'
  const ui=await boot(t);
  await ui.invoke('position','left');await ui.invoke('visibility','always');
  const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'settings.json'),'utf8'));
- assert.deepEqual(saved,{enabled:[],position:'left',visibility:'always',alerts:true,alertSeconds:10});
+ assert.deepEqual({enabled:saved.enabled,position:saved.position,visibility:saved.visibility,alerts:saved.alerts,alertSeconds:saved.alertSeconds,alertThresholds:saved.alertThresholds,peekShortcut:saved.peekShortcut},{enabled:[],position:'left',visibility:'always',alerts:true,alertSeconds:10,alertThresholds:[90],peekShortcut:'Control+Alt+N'});
  assert.equal(fs.existsSync(path.join(ui.directory,'settings.json.tmp')),false);
 });
 
@@ -183,4 +188,67 @@ test('alerts can be turned off and the duration is saved clamped',async t=>{
  await ui.invoke('alerts',{enabled:true,seconds:500});
  const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'settings.json'),'utf8'));
  assert.equal(saved.alerts,true);assert.equal(saved.alertSeconds,60);
+});
+
+test('a limit that was alerted on comes out once more, in green, when it resets',async t=>{
+ let percent=95;
+ const ui=await boot(t,{enabled:['claude'],usage:()=>[{label:'Session',percent,reset:null}]});
+ await flush();ui.runTimers();assert.equal(ui.state().alerting,false);
+ percent=3;await ui.intervals.values().next().value();await flush();
+ assert.equal(ui.state().alerting,true);assert.equal(ui.state().alertKind,'reset');assert.equal(ui.state().accounts[0].notice,'reset');
+ ui.runTimers();assert.equal(ui.state().accounts[0].notice,null);
+});
+test('quiet hours hold alerts back; notifications follow the setting',async t=>{
+ const hour=new Date().getHours(),pad=n=>String(n).padStart(2,'0');
+ const quiet={enabled:true,start:pad((hour+23)%24)+':00',end:pad((hour+2)%24)+':00'};
+ const ui=await boot(t,{visibility:'hidden',enabled:['claude'],saved:{quiet},usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(ui.windows[0].visible,false);assert.equal(ui.notifications.length,0);
+ const loud=await boot(t,{enabled:['claude'],saved:{systemNotifications:true},usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(loud.notifications.length,1);assert.match(loud.notifications[0].body,/Session is at 95%/);
+});
+test('alert thresholds and options are saved cleaned',async t=>{
+ const ui=await boot(t);
+ await ui.invoke('alerts',{thresholds:[100,75,33],pace:false,notifications:true,quiet:{enabled:true,start:'21:30',end:'bad'}});
+ const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'settings.json'),'utf8'));
+ assert.deepEqual(saved.alertThresholds,[75,100]);assert.equal(saved.paceAlerts,false);assert.equal(saved.systemNotifications,true);
+ assert.deepEqual(saved.quiet,{enabled:true,start:'21:30',end:'08:00'});
+});
+test('the peek shortcut opens a hidden notch for a moment and can be changed',async t=>{
+ const ui=await boot(t,{visibility:'hidden'});await flush();
+ assert.ok(ui.shortcuts.has('Control+Alt+N'));assert.equal(ui.windows[0].visible,false);
+ ui.shortcuts.get('Control+Alt+N')();assert.equal(ui.windows[0].visible,true);assert.equal(ui.state().alertKind,'peek');
+ ui.runTimers();assert.equal(ui.windows[0].visible,false);
+ await ui.invoke('shortcut','off');assert.equal(ui.shortcuts.size,0);
+ await ui.invoke('shortcut','Control+Alt+U');assert.ok(ui.shortcuts.has('Control+Alt+U'));
+ await ui.invoke('shortcut','Alt+F4');assert.equal(ui.state().peekShortcut,'Control+Alt+U');
+ const taken=await boot(t,{shortcutTaken:true});await flush();assert.match(taken.state().shortcutError,/Another app/);
+});
+test('the notch can be placed on another display',async t=>{
+ const displays=[{id:1,size:{width:1920,height:1080},workArea:{x:0,y:0,width:1920,height:1040}},{id:2,size:{width:2560,height:1440},workArea:{x:1920,y:0,width:2560,height:1400}}];
+ const ui=await boot(t,{displays});await flush();
+ assert.equal(ui.state().displays.length,2);assert.match(ui.state().displays[0].label,/main/);
+ await ui.invoke('display','2');assert.equal(ui.windows[0].bounds.x+ui.windows[0].bounds.width,1920+2560);
+ await ui.invoke('display','99');assert.equal(ui.state().display,'2');
+});
+test('a ring choice per account is saved',async t=>{
+ const ui=await boot(t);await ui.invoke('ring','claude','highest');assert.equal(ui.state().accounts[0].ring,'highest');
+ await ui.invoke('ring','claude','auto');assert.equal(ui.state().accounts[0].ring,'auto');await ui.invoke('ring','nobody','highest');
+});
+test('alerts off silences notifications too, and leaves no notice for a later peek',async t=>{
+ const ui=await boot(t,{enabled:['claude'],saved:{alerts:false,systemNotifications:true},usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(ui.notifications.length,0);
+ ui.shortcuts.get('Control+Alt+N')();assert.equal(ui.state().alertKind,'peek');assert.equal(ui.state().accounts[0].notice,null);
+});
+test('changing visibility during an alert clears its notices',async t=>{
+ const ui=await boot(t,{enabled:['claude'],usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(ui.state().accounts[0].notice,'limit');
+ await ui.invoke('visibility','always');assert.equal(ui.state().alerting,false);
+ ui.shortcuts.get('Control+Alt+N')();assert.equal(ui.state().accounts[0].notice,null);
+});
+test('history left behind by a disabled account is removed at startup',async t=>{
+ const now=Date.now();
+ const ui=await boot(t,{enabled:['claude'],history:{version:1,series:{'claude\u001fSession':[[now,40]],'gone\u001fSession':[[now,70]]}}});
+ for(let i=0;i<20&&JSON.parse(fs.readFileSync(path.join(ui.directory,'history.json'),'utf8')).series['gone\u001fSession'];i++)await new Promise(r=>setTimeout(r,10));
+ const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'history.json'),'utf8'));
+ assert.equal(saved.series['gone\u001fSession'],undefined);assert.ok(saved.series['claude\u001fSession']);
 });

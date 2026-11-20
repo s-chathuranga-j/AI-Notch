@@ -217,13 +217,7 @@ final class NotchWindowController {
     private func tooltipRect(index: Int) -> CGRect? {
         guard model.snapshots.indices.contains(index) else { return nil }
         let snapshot = model.snapshots[index]
-        let cardHeight = NotchLayout.cardHeight(
-            windowCount: snapshot.statusMessage == nil ? snapshot.windows.count : 0,
-            sessionCount: model.activity(for: snapshot.id)?.sessions.count ?? 0,
-            sessionCap: model.sessionCap,
-            statusMessage: snapshot.statusMessage,
-            blockMessage: snapshot.block?.summary(now: model.now)
-        )
+        let cardHeight = model.cardContent(for: snapshot).height
         // Across the stack the region is the card, its tail, and the gap the
         // pointer has to cross. Along it, the card's own extent.
         let cardAcross = model.edge.isVertical ? NotchLayout.cardWidth : cardHeight
@@ -499,6 +493,7 @@ final class NotchWindowController {
         alertWork?.cancel()
         alertWork = nil
         model.isAlerting = false
+        model.noticeIDs = []
         switch visibility {
         case .alwaysShow:
             panel?.orderFrontRegardless()
@@ -542,16 +537,33 @@ final class NotchWindowController {
     /// warning colours, for `duration` seconds. Then it goes back to whatever
     /// Settings says: folded for Show on hover, off screen for Hide. Always
     /// show is already open, so there is nothing to announce.
-    func announceUsageAlert(duration: TimeInterval) {
-        guard visibility != .alwaysShow else { return }
+    ///
+    /// `notices` are the providers whose news is good — a limit that has come
+    /// back — so their rings can say so in green. A later alert for the same
+    /// provider that is not good news takes it off the list.
+    func announceUsageAlert(duration: TimeInterval, notices: Set<String> = [],
+                            warnings: Set<String> = []) {
+        let carried = model.isAlerting ? model.noticeIDs : []
+        model.noticeIDs = carried.subtracting(warnings).union(notices)
         alertWork?.cancel()
+        // Always show is already open, so nothing moves — but it still enters
+        // the timed alert state, which is what tints a reset ring green and
+        // what clears that tint again when the time is up.
+        guard visibility != .alwaysShow else {
+            model.isAlerting = true
+            scheduleAlertEnd(after: duration)
+            return
+        }
         foldWork?.cancel()
         foldWork = nil
         model.isAlerting = true
         if visibility == .hidden { panel?.orderFrontRegardless() }
         withAnimation(NotchMotion.unfold) { model.isExpanded = true }
         updateInteractiveRects()
+        scheduleAlertEnd(after: duration)
+    }
 
+    private func scheduleAlertEnd(after duration: TimeInterval) {
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated { self?.endUsageAlert() }
         }
@@ -561,6 +573,7 @@ final class NotchWindowController {
 
     private func endUsageAlert() {
         alertWork = nil
+        model.noticeIDs = []
         guard model.isAlerting else { return }
         model.isAlerting = false
         switch visibility {

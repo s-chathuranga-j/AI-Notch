@@ -20,6 +20,9 @@ struct ProviderRing: View {
     var activity: ActivitySummary?
     /// A fetch this cell asked for, in flight.
     var isRefreshing: Bool = false
+    /// Out for good news — this limit has come back — so the whole ring goes
+    /// green while the alert lasts.
+    var isNotice: Bool = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spin: Double = 0
@@ -36,7 +39,9 @@ struct ProviderRing: View {
             // even when the percentage behind it has gone stale.
             ZStack {
                 Circle()
-                    .strokeBorder(Palette.ringTrack, lineWidth: NotchLayout.trackStroke)
+                    .strokeBorder(isNotice ? Palette.ample.opacity(0.45) : Palette.ringTrack,
+                                  lineWidth: NotchLayout.trackStroke)
+                    .animation(NotchMotion.reading, value: isNotice)
 
                 if usedFraction != nil {
                     Circle()
@@ -159,6 +164,7 @@ struct ProviderCell: View {
     let snapshot: ProviderSnapshot
     var activity: ActivitySummary?
     var isRefreshing: Bool = false
+    var isNotice: Bool = false
 
     /// A dash, not "0%": nothing read is not the same as nothing used.
     private var percentText: String {
@@ -173,7 +179,8 @@ struct ProviderCell: View {
                 isStale: snapshot.status.isStale || !snapshot.hasReading,
                 isBlocked: snapshot.block != nil,
                 activity: activity,
-                isRefreshing: isRefreshing
+                isRefreshing: isRefreshing,
+                isNotice: isNotice
             )
             Text(percentText)
                 .font(Typography.percent)

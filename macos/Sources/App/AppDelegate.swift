@@ -13,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Held for the life of the app: releasing it stops the scheduled checks.
     private var updater: Updater?
     private var statusItem: StatusItemController?
+    private var watch: UsageWatch?
+    private var notifier: SystemNotifier?
+    private var hotKey: PeekHotKey?
     private var cancellables = Set<AnyCancellable>()
 
     /// The unit bundle is hosted by this app, so `xcodebuild test` launches it
@@ -143,23 +146,103 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .sink { [weak store] in store?.disconnected = $0 }
                 .store(in: &cancellables)
 
-            var alerts = UsageAlertTracker()
+            // The demo never touches the real history file.
+            let watch = UsageWatch(file: isDemo ? nil : UsageHistoryFile.standard)
+            self.watch = watch
+            let notifier = SystemNotifier()
+            self.notifier = notifier
+
+            preferences.$systemNotificationsEnabled
+                .dropFirst()
+                .filter { $0 }
+                .sink { _ in notifier.requestAuthorization() }
+                .store(in: &cancellables)
+
+            preferences.$disconnectedProviders
+                .sink { [weak controller] off in
+                    watch.forget(providerIDs: off)
+                    controller?.model.noticeIDs.subtract(off)
+                }
+                .store(in: &cancellables)
+
+            // The ring follows the user's choice of window; alerts and the
+            // history still see every window as the provider reported it.
+            let pointRings = { (readings: [ProviderSnapshot]) in
+                readings.map { $0.applying(preferences.ringChoice(for: $0.id)) }
+            }
+            let guide = { Double(UsageAlertTracker.clean(preferences.usageAlertThresholds).first ?? 90) }
+            // The chart's guide follows the lowest alert level, so a change of
+            // levels redraws it without waiting for the next reading.
+            preferences.$usageAlertThresholds
+                .dropFirst()
+                .receive(on: RunLoop.main)
+                .sink { [weak controller] _ in
+                    controller?.model.insights = watch.insights(
+                        for: pointRings(watch.lastReadings), guidePercent: guide()
+                    )
+                }
+                .store(in: &cancellables)
+
+            preferences.$ringChoices
+                .dropFirst()
+                .receive(on: RunLoop.main)
+                .sink { [weak controller] _ in
+                    // `@Published` delivers before the new value is stored;
+                    // the hop onto the run loop above is what lets this read it.
+                    let pointed = pointRings(watch.lastReadings)
+                    controller?.model.snapshots = pointed
+                    controller?.model.insights = watch.insights(for: pointed, guidePercent: guide())
+                }
+                .store(in: &cancellables)
+
+            // A look from any app. The same trip out as an alert, without the
+            // tint or the notification.
+            let hotKey = PeekHotKey { [weak controller] in
+                controller?.announceUsageAlert(duration: TimeInterval(preferences.usageAlertSeconds))
+            }
+            self.hotKey = hotKey
+            preferences.$peekShortcut
+                .receive(on: RunLoop.main)
+                .sink { shortcut in
+                    preferences.peekShortcutProblem = hotKey.register(shortcut)
+                        ? nil : "Another app is using this shortcut. Choose a different one."
+                }
+                .store(in: &cancellables)
+
             store.$snapshots
                 .receive(on: RunLoop.main)
                 .sink { [weak controller] snapshots in
                     let shown = isDemo ? Fixtures.snapshots() : snapshots
                     withAnimation(NotchMotion.unfold) {
-                        controller?.model.snapshots = shown
+                        controller?.model.snapshots = pointRings(shown)
                     }
-                    controller?.model.now = Date()
-                    // Fed on every reading, alerts on or off, so switching them
-                    // on later does not announce a limit that was crossed long ago.
-                    let crossed = alerts.newAlerts(in: shown)
-                    if !crossed.isEmpty, preferences.usageAlertsEnabled {
-                        controller?.announceUsageAlert(
-                            duration: TimeInterval(preferences.usageAlertSeconds)
-                        )
+                    let now = Date()
+                    controller?.model.now = now
+                    // Alerts off silences everything, notifications included.
+                    // Neither that nor quiet hours tells the tracker, so a limit
+                    // still high afterwards is announced then, not lost.
+                    // A batch queued before a provider was switched off must not
+                    // put it back into the history that was just cleared.
+                    let notices = watch.receive(
+                        shown.filter { !preferences.disconnectedProviders.contains($0.id) },
+                        record: !isDemo,
+                        judge: preferences.usageAlertsEnabled
+                            && !preferences.quietHours.contains(now),
+                        thresholds: preferences.usageAlertThresholds,
+                        paceAlerts: preferences.paceAlertsEnabled, now: now
+                    )
+                    controller?.model.insights = watch.insights(
+                        for: pointRings(shown), now: now, guidePercent: guide()
+                    )
+                    guard !notices.isEmpty else { return }
+                    if preferences.systemNotificationsEnabled {
+                        for notice in notices { notifier.post(notice) }
                     }
+                    controller?.announceUsageAlert(
+                        duration: TimeInterval(preferences.usageAlertSeconds),
+                        notices: Set(notices.filter { $0.kind == .reset }.map(\.providerID)),
+                        warnings: Set(notices.filter { $0.kind != .reset }.map(\.providerID))
+                    )
                 }
                 .store(in: &cancellables)
             if isDemo { controller.model.snapshots = Fixtures.snapshots() }
@@ -234,6 +317,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         store?.stop()
+        watch?.saveNow()
         activityController?.stop()
         notchController?.stop()
     }

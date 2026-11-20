@@ -1,0 +1,97 @@
+name: Release Windows
+
+# Builds the Setup EXE and portable ZIPs on Windows and drafts a GitHub release.
+# Runs when Windows changes land on main and no release exists yet for the
+# version in windows/package.json, on a windows-vX.Y.Z tag, or from the Actions
+# tab. The draft is published by hand after checking it.
+on:
+  push:
+    tags: ['windows-v*']
+    branches: [main]
+    paths: ['windows/**']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit to build
+        default: main
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./windows/package.json').version")
+          # A merge to main drafts a release only once per version; tags and manual runs always build.
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = branch ] && gh release view "windows-v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "windows-v$version already has a release; nothing to do."; echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: windows
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run package
+      - name: Checksums and release notes
+        id: meta
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "windows-v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1
+          fi
+          # The commit actually checked out, which on a manual run may not be github.sha.
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          cd dist
+          sha256sum "AI-Notch-$version-Windows-Setup.exe" "AI-Notch-$version-Windows-x64.zip" "AI-Notch-$version-Windows-arm64.zip" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+          # The release body is the newest section of RELEASE-NOTES.md.
+          awk 'NR>1 && /^## /{exit} {print}' RELEASE-NOTES.md | tail -n +2 > dist/release-notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ steps.meta.outputs.version }}
+          path: |
+            windows/dist/*.exe
+            windows/dist/*.zip
+            windows/dist/SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: windows-v${{ steps.meta.outputs.version }}
+          target_commitish: ${{ steps.meta.outputs.sha }}
+          name: AI Notch for Windows v${{ steps.meta.outputs.version }}
+          body_path: windows/dist/release-notes.md
+          files: |
+            windows/dist/AI-Notch-${{ steps.meta.outputs.version }}-Windows-Setup.exe
+            windows/dist/AI-Notch-${{ steps.meta.outputs.version }}-Windows-x64.zip
+            windows/dist/AI-Notch-${{ steps.meta.outputs.version }}-Windows-arm64.zip
+            windows/dist/SHA256SUMS.txt
