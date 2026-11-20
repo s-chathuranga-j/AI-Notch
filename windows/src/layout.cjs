@@ -1,7 +1,7 @@
 function notchBounds(area, position, accountCount, expanded, settings, details = false) {
   const side = position === 'left' || position === 'right';
-  // Rail: 2×40 end padding (clears the ears) + spacer and gear (2×28) + two 24px gaps, then the rings.
-  const railHeight = 184 + accountCount * 67 + Math.max(0, accountCount - 1) * 31;
+  // Rail: 2×68 end padding (clears the ear and corner taper) + gear (28) + one 24px gap, then the rings.
+  const railHeight = 188 + accountCount * 67 + Math.max(0, accountCount - 1) * 31;
   // Row: 2×50 end padding + spacer and gear (2×28) + two 24px gaps, then the rings.
   const overviewWidth = Math.max(204, Math.min(640, 204 + accountCount * 44 + Math.max(0, accountCount - 1) * 31));
   const open = expanded || settings;

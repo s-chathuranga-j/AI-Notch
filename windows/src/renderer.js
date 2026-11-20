@@ -85,6 +85,21 @@ function updateView(){
  document.body.classList.toggle('details',selected!==null&&!current?.settings);
  for(const row of $('accounts').children)row.hidden=!current?.settings&&row.dataset.account!==selected;
  for(const chip of $('compact').children)chip.setAttribute('aria-expanded',String(chip.dataset.account===selected&&!current?.settings));
+ alignDetail();
+}
+// On a side edge the details card sits beside the ring it belongs to, not always at the top.
+function alignDetail(){
+ const content=$('content');if(!content?.style)return;
+ const side=current?.position==='left'||current?.position==='right';
+ const row=[...$('accounts').children].find(r=>r.dataset.account===selected);
+ const chip=[...$('compact').children].find(c=>c.dataset.account===selected);
+ if(!side||current?.settings||!row?.getBoundingClientRect||!chip?.firstChild?.getBoundingClientRect){content.style.paddingTop='';return;}
+ const edge=48,box=content.getBoundingClientRect(),rowBox=row.getBoundingClientRect(),ring=chip.firstChild.getBoundingClientRect();
+ if(!rowBox.height)return;
+ const padding=parseFloat(getComputedStyle(content).paddingTop)||0;
+ const above=rowBox.top-box.top-padding; // the heading, which travels with the card
+ const wanted=ring.top+ring.height/2-box.top-above-rowBox.height/2;
+ content.style.paddingTop=Math.round(Math.max(edge,Math.min(wanted,box.height-edge-above-rowBox.height)))+'px';
 }
 function showDetail(id){clearTimeout(timer);if(current?.settings||selected===id)return;selected=id;isExpanded=true;updateView();window.notch.detail(id);}
 function expand(){clearTimeout(timer);if(current?.alerting){window.notch.expand(true);return;}if(isExpanded)return;isExpanded=true;updateView();window.notch.expand(true);}
@@ -105,4 +120,4 @@ document.body.onmouseleave=()=>{clearTimeout(timer);timer=setTimeout(collapse,35
 document.body.onfocusin=expand;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(current?.settings)window.notch.settings();else collapse();}});
 window.notch.onState(render);window.notch.state().then(render);
-window.addEventListener('resize',updateShape);
+window.addEventListener('resize',()=>{updateShape();alignDetail();});

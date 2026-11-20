@@ -64,7 +64,9 @@ input{accent-color:#b8a4ef;width:17px;height:17px;margin:0;cursor:pointer;flex-s
 body[data-position=bottom] main{flex-direction:column-reverse}
 body:is([data-position=left],[data-position=right]) main{flex-direction:row}
 body[data-position=right] main{flex-direction:row-reverse}
-body:is([data-position=left],[data-position=right]) header{width:70px;height:100%;flex:0 0 70px;flex-direction:column;gap:24px;padding:40px 12px}
+/* On a 70px rail the ear and the free-side corner together taper over ~68px at each end. */
+body:is([data-position=left],[data-position=right]) header{width:70px;height:100%;flex:0 0 70px;flex-direction:column;gap:24px;padding:68px 12px}
+body:is([data-position=left],[data-position=right]) header::before{display:none}
 body:is([data-position=left],[data-position=right]) #settings{margin-bottom:0}
 body:is([data-position=left],[data-position=right]) #compact{flex-direction:column;min-height:0;overflow-x:hidden;overflow-y:auto;flex-shrink:1;width:46px}
 body:is([data-position=left],[data-position=right]) .subscription-chip{flex:0 0 67px;width:44px}
