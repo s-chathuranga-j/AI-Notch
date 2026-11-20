@@ -186,6 +186,20 @@ final class UsageAlertTests: XCTestCase {
         XCTAssertEqual(again.quietHours.start, 23 * 60)
     }
 
+    /// Alerts off, or quiet hours, do not tell the tracker — so a limit still
+    /// high when they end is announced then, not lost.
+    @MainActor
+    func testAHeldBackLimitIsAnnouncedOnceAlertsMaySpeak() {
+        let watch = UsageWatch(file: nil)
+        let high = [snapshot("claude", session: 0.95)]
+        XCTAssertEqual(watch.receive(high, record: false, judge: false,
+                                     thresholds: [90], paceAlerts: true), [])
+        XCTAssertEqual(watch.receive(high, record: false, judge: true,
+                                     thresholds: [90], paceAlerts: true).map(\.kind), [.limit])
+        XCTAssertEqual(watch.receive(high, record: false, judge: true,
+                                     thresholds: [90], paceAlerts: true), [])
+    }
+
     func testAlertDurationIsClamped() {
         XCTAssertEqual(Preferences.clampAlertSeconds(0), Preferences.alertSecondsRange.lowerBound)
         XCTAssertEqual(Preferences.clampAlertSeconds(10), 10)

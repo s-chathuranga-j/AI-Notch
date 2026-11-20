@@ -282,10 +282,12 @@ private struct LimitWindowRow: View {
 }
 
 /// The last seven days of one window: each bar the day's highest reading,
-/// coloured as the ring would have been, under a dotted line at 90%.
+/// coloured as the ring would have been, under a dotted line at the lowest
+/// alert level.
 private struct DailyPeaksChart: View {
     let peaks: [DailyPeak]
     let label: String
+    var guidePercent: Double = 90
 
     private var average: Int? {
         let known = peaks.compactMap(\.peak)
@@ -328,7 +330,7 @@ private struct DailyPeaksChart: View {
                 .frame(width: width, height: NotchLayout.peaksBarsHeight, alignment: .bottomLeading)
 
                 Path { path in
-                    let y = NotchLayout.peaksBarsHeight * 0.1
+                    let y = NotchLayout.peaksBarsHeight * (1 - min(max(guidePercent, 0), 100) / 100)
                     path.move(to: CGPoint(x: 0, y: y))
                     path.addLine(to: CGPoint(x: width, y: y))
                 }
@@ -404,7 +406,8 @@ private struct ProviderTooltip: View {
                         .padding(.top, index == 0 ? NotchLayout.headerToBlock : NotchLayout.blockSpacing)
                 }
                 if content?.showsPeaks == true, let peaks = insights?.peaks {
-                    DailyPeaksChart(peaks: peaks, label: insights?.peaksLabel ?? "")
+                    DailyPeaksChart(peaks: peaks, label: insights?.peaksLabel ?? "",
+                                    guidePercent: insights?.guidePercent ?? 90)
                         .padding(.top, NotchLayout.blockSpacing)
                 }
             }

@@ -493,6 +493,7 @@ final class NotchWindowController {
         alertWork?.cancel()
         alertWork = nil
         model.isAlerting = false
+        model.noticeIDs = []
         switch visibility {
         case .alwaysShow:
             panel?.orderFrontRegardless()

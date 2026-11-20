@@ -33,16 +33,18 @@ final class UsageHistoryTests: XCTestCase {
         history.samples(providerID: id, windowID: "session").map { ($0.percent * 1000).rounded() / 1000 }
     }
 
-    func testKeepsAtMostOneSamplePerFiveMinutesButAlwaysADrop() {
+    func testThinsReadingsWithTrueTimestampsAndKeepsDrops() {
         var history = UsageHistory()
-        history.add(snapshot(10), now: t0)
-        history.add(snapshot(12), now: t0.addingTimeInterval(minute))
-        history.add(snapshot(15), now: t0.addingTimeInterval(6 * minute))
-        XCTAssertEqual(percents(history), [12, 15])
-        XCTAssertEqual(history.samples(providerID: "c", windowID: "session").first?.at, t0)
+        for m in [0.0, 1, 2, 3, 4, 6] {
+            history.add(snapshot(10 + m), now: t0.addingTimeInterval(m * minute))
+        }
+        XCTAssertEqual(percents(history), [10, 14, 16])
+        XCTAssertEqual(history.samples(providerID: "c", windowID: "session").map { $0.at.timeIntervalSince(t0) },
+                       [0, 4 * minute, 6 * minute])
 
         history.add(snapshot(2), now: t0.addingTimeInterval(7 * minute))
         XCTAssertEqual(percents(history).last, 2)
+        XCTAssertEqual(percents(history).count, 4, "a drop is a new sample")
     }
 
     func testIgnoresStaleReadingsPrunesForgetsAndRoundTrips() throws {

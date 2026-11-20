@@ -149,8 +149,10 @@ struct SettingsView: View {
                             .toggleStyle(.checkbox)
                     }
                 }
+                .disabled(!preferences.usageAlertsEnabled)
 
                 Toggle("Warn early if the pace runs out before reset", isOn: $preferences.paceAlertsEnabled)
+                    .disabled(!preferences.usageAlertsEnabled)
 
                 Text("Once per limit, when the last hour or so of use would run it out before it resets, within the hour. A limit that alerted and then resets brings the notch out once more, in green.")
                     .font(.caption)
@@ -168,7 +170,24 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Toggle("Also show notifications", isOn: $preferences.systemNotificationsEnabled)
+                // Alerts off silences everything, so these go quiet with it.
+                Group {
+                    Toggle("Also show notifications", isOn: $preferences.systemNotificationsEnabled)
+                    Toggle("Quiet hours", isOn: $preferences.quietHoursEnabled)
+                    HStack {
+                        DatePicker("From", selection: timeBinding(\.quietHoursStart),
+                                   displayedComponents: .hourAndMinute)
+                        DatePicker("to", selection: timeBinding(\.quietHoursEnd),
+                                   displayedComponents: .hourAndMinute)
+                    }
+                    .disabled(!preferences.quietHoursEnabled)
+
+                    Text("No alerts or notifications during these hours. They may cross midnight; a limit still high when they end is announced then.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .disabled(!preferences.usageAlertsEnabled)
 
                 Picker("Peek shortcut", selection: $preferences.peekShortcut) {
                     ForEach(PeekShortcut.allCases) { Text($0.title).tag($0) }
@@ -180,19 +199,6 @@ struct SettingsView: View {
                     .foregroundStyle(preferences.peekShortcutProblem == nil ? Color.secondary : Color.orange)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Toggle("Quiet hours", isOn: $preferences.quietHoursEnabled)
-                HStack {
-                    DatePicker("From", selection: timeBinding(\.quietHoursStart),
-                               displayedComponents: .hourAndMinute)
-                    DatePicker("to", selection: timeBinding(\.quietHoursEnd),
-                               displayedComponents: .hourAndMinute)
-                }
-                .disabled(!preferences.quietHoursEnabled)
-
-                Text("No alerts or notifications during these hours. They may cross midnight.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // Startup and updates together: both are about what AI Notch does

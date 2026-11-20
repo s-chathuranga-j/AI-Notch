@@ -29,7 +29,11 @@ final class UsageWatch {
     /// Records the readings and returns what is worth announcing. Takes the
     /// readings as the providers reported them: alerts are per window, and do
     /// not care which one the ring stands for.
-    func receive(_ snapshots: [ProviderSnapshot], record: Bool,
+    ///
+    /// With `judge` false — alerts off, or quiet hours — the tracker is not
+    /// told at all, so a limit that is still high when they end is announced
+    /// then rather than lost.
+    func receive(_ snapshots: [ProviderSnapshot], record: Bool, judge: Bool,
                  thresholds: Set<Int>, paceAlerts: Bool,
                  now: Date = Date()) -> [UsageNotice] {
         lastReadings = snapshots
@@ -38,6 +42,7 @@ final class UsageWatch {
             saveIfDue(now: now)
         }
         tracker.retain(providerIDs: Set(snapshots.map(\.id)))
+        guard judge else { return [] }
         return tracker.notices(for: snapshots, thresholds: thresholds,
                                paceAlerts: paceAlerts,
                                forecasts: insights(for: snapshots, now: now).mapValues(\.forecasts),
@@ -46,10 +51,12 @@ final class UsageWatch {
 
     /// What the tooltip can say about each provider. The daily peaks follow
     /// the ring, so pass the readings with the user's ring choice applied.
-    func insights(for snapshots: [ProviderSnapshot], now: Date = Date()) -> [String: ProviderInsights] {
+    func insights(for snapshots: [ProviderSnapshot], now: Date = Date(),
+                  guidePercent: Double = 90) -> [String: ProviderInsights] {
         var insights: [String: ProviderInsights] = [:]
         for snapshot in snapshots {
-            if let made = ProviderInsights.make(for: snapshot, history: history, now: now) {
+            if let made = ProviderInsights.make(for: snapshot, history: history, now: now,
+                                                guidePercent: guidePercent) {
                 insights[snapshot.id] = made
             }
         }

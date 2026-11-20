@@ -34,8 +34,8 @@ struct UsageSample: Equatable, Codable {
 ///
 /// Only percentages and timestamps are kept — never credentials, account names
 /// or provider responses — so the file says how busy you were and nothing about
-/// who you are or what you did. At most one sample per `sampleGap`, pruned after
-/// `keep`.
+/// who you are or what you did. Thinned to about two samples per `sampleGap`,
+/// pruned after `keep`.
 struct UsageHistory: Equatable {
     static let sampleGap: TimeInterval = 5 * 60
     static let keep: TimeInterval = 8 * 24 * 60 * 60
@@ -62,16 +62,17 @@ struct UsageHistory: Equatable {
             let percent = used * 100
             let key = Self.key(snapshot.id, window.id)
             var list = series[key] ?? []
-            // Always keep a sample that drops — a reset — so the forecast can
-            // see the new window start. A rise inside the gap updates the last
-            // sample instead, so the peak is not lost.
-            if let last = list.last, now.timeIntervalSince(last.at) < Self.sampleGap,
+            // Within `sampleGap` of the sample before it, the newest reading
+            // replaces the trailing one — with its own timestamp, so the series
+            // never backdates a reading and the forecast is not early. A drop
+            // (a reset) is always kept as a new sample, so the forecast can see
+            // the new window start.
+            if list.count >= 2, let last = list.last,
+               now.timeIntervalSince(list[list.count - 2].at) < Self.sampleGap,
                percent >= last.percent {
-                if percent != last.percent {
-                    list[list.count - 1].percent = percent
-                    series[key] = list
-                    changed = true
-                }
+                list[list.count - 1] = UsageSample(at: now, percent: percent)
+                series[key] = list
+                changed = true
                 continue
             }
             list.append(UsageSample(at: now, percent: percent))
@@ -229,14 +230,19 @@ struct ProviderInsights: Equatable {
     var peaks: [DailyPeak]?
     /// Which window the peaks are for.
     var peaksLabel: String?
+    /// Where the chart's dotted guide sits, in percent: the lowest alert level,
+    /// so a bar crossing it is a day that would have alerted.
+    var guidePercent: Double = 90
 
     var isEmpty: Bool { forecasts.isEmpty && peaks == nil }
 
     /// Works out what can be said about a provider from its history.
     static func make(for snapshot: ProviderSnapshot, history: UsageHistory,
-                     now: Date = Date(), calendar: Calendar = .current) -> ProviderInsights? {
+                     now: Date = Date(), calendar: Calendar = .current,
+                     guidePercent: Double = 90) -> ProviderInsights? {
         guard UsageAlertTracker.isTrusted(snapshot), snapshot.statusMessage == nil else { return nil }
         var insights = ProviderInsights()
+        insights.guidePercent = guidePercent
         for window in snapshot.windows where window.usedFraction != nil {
             let samples = history.samples(providerID: snapshot.id, windowID: window.id)
             if let f = UsageInsights.forecast(samples, now: now, resetsAt: window.resetsAt) {

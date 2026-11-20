@@ -159,7 +159,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .store(in: &cancellables)
 
             preferences.$disconnectedProviders
-                .sink { watch.forget(providerIDs: $0) }
+                .sink { [weak controller] off in
+                    watch.forget(providerIDs: off)
+                    controller?.model.noticeIDs.subtract(off)
+                }
                 .store(in: &cancellables)
 
             // The ring follows the user's choice of window; alerts and the
@@ -167,6 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let pointRings = { (readings: [ProviderSnapshot]) in
                 readings.map { $0.applying(preferences.ringChoice(for: $0.id)) }
             }
+            let guide = { Double(UsageAlertTracker.clean(preferences.usageAlertThresholds).first ?? 90) }
             preferences.$ringChoices
                 .dropFirst()
                 .receive(on: RunLoop.main)
@@ -175,7 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     // the hop onto the run loop above is what lets this read it.
                     let pointed = pointRings(watch.lastReadings)
                     controller?.model.snapshots = pointed
-                    controller?.model.insights = watch.insights(for: pointed)
+                    controller?.model.insights = watch.insights(for: pointed, guidePercent: guide())
                 }
                 .store(in: &cancellables)
 
@@ -202,25 +206,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                     let now = Date()
                     controller?.model.now = now
-                    // Fed on every reading, alerts on or off, so switching them
-                    // on later does not announce a limit that was crossed long ago.
+                    // Alerts off silences everything, notifications included.
+                    // Neither that nor quiet hours tells the tracker, so a limit
+                    // still high afterwards is announced then, not lost.
                     let notices = watch.receive(
                         shown, record: !isDemo,
+                        judge: preferences.usageAlertsEnabled
+                            && !preferences.quietHours.contains(now),
                         thresholds: preferences.usageAlertThresholds,
                         paceAlerts: preferences.paceAlertsEnabled, now: now
                     )
-                    controller?.model.insights = watch.insights(for: pointRings(shown), now: now)
-                    guard !notices.isEmpty, !preferences.quietHours.contains(now) else { return }
+                    controller?.model.insights = watch.insights(
+                        for: pointRings(shown), now: now, guidePercent: guide()
+                    )
+                    guard !notices.isEmpty else { return }
                     if preferences.systemNotificationsEnabled {
                         for notice in notices { notifier.post(notice) }
                     }
-                    if preferences.usageAlertsEnabled {
-                        controller?.announceUsageAlert(
-                            duration: TimeInterval(preferences.usageAlertSeconds),
-                            notices: Set(notices.filter { $0.kind == .reset }.map(\.providerID)),
-                            warnings: Set(notices.filter { $0.kind != .reset }.map(\.providerID))
-                        )
-                    }
+                    controller?.announceUsageAlert(
+                        duration: TimeInterval(preferences.usageAlertSeconds),
+                        notices: Set(notices.filter { $0.kind == .reset }.map(\.providerID)),
+                        warnings: Set(notices.filter { $0.kind != .reset }.map(\.providerID))
+                    )
                 }
                 .store(in: &cancellables)
             if isDemo { controller.model.snapshots = Fixtures.snapshots() }
