@@ -1,4 +1,10 @@
-# AI Notch for Windows v0.4.0 — Preview
+# AI Notch for Windows v0.4.1 — Preview
+
+- **History from day one.** The seven-day chart in account details now appears from the first day with a reading and fills in over the week, instead of staying hidden until a second day.
+
+The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs and SHA-256 checksums are included. This is an unsigned preview.
+
+## Earlier release: Windows v0.4.0
 
 AI Notch now tells you when a limit is about to run out, and when it is back.
 
