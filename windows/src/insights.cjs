@@ -1,7 +1,7 @@
 // Usage history, pace forecasts and daily peaks. Pure and clock-injected so it can be tested.
 //
 // Only percentages and timestamps are kept, per account and window label, never credentials or
-// provider responses. Samples are at most one per SAMPLE_GAP and pruned after KEEP.
+// provider responses. Readings are thinned to about two per SAMPLE_GAP and pruned after KEEP.
 const MINUTE=60000,HOUR=60*MINUTE,DAY=24*HOUR;
 const SAMPLE_GAP=5*MINUTE,KEEP=8*DAY;
 const sep='\u001f';

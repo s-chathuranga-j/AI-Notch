@@ -55,7 +55,8 @@ function onReading(id,row){
  if(!config.alerts||isQuiet(config.quiet)){alerts.update(id,row,config.alertThresholds,true);return;}
  const result=alerts.update(id,row,config.alertThresholds);
  let kind=null,detail=null;
- if(result.crossed.length){kind='limit';detail=result.crossed.at(-1);}
+ // Several windows can cross in one reading; the message names the most serious.
+ if(result.crossed.length){kind='limit';detail=[...result.crossed].sort((a,b)=>b.threshold-a.threshold||b.percent-a.percent)[0];}
  else if(config.paceAlerts&&!row.stale){
   for(const w of row.windows||[]){const f=forecastFor(id,w);if(alerts.pace(id,w.label,w.percent,f)){kind='pace';detail={label:w.label,percent:w.percent,eta:f.eta};break;}}
  }
