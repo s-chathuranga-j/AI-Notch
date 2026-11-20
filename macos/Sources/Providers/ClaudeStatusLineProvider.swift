@@ -12,6 +12,11 @@ struct ClaudeStatusLineProvider: UsageProvider {
         profile.configDirectory.appendingPathComponent("ai-notch-usage.json")
     }
 
+    /// When Claude Code last wrote a reading, without reading it.
+    var readingModifiedAt: Date? {
+        (try? FileManager.default.attributesOfItem(atPath: readingURL.path))?[.modificationDate] as? Date
+    }
+
     var signInRoute: SignInRoute {
         .guidance("Copy the status line command into this profile’s Claude Code settings, then use Claude Code normally.")
     }

@@ -11,7 +11,7 @@ import os
 /// The numbers are Anthropic's, so this is `.official` — the tooltip shows them
 /// unqualified. The endpoint is not a published API, though, so every failure
 /// path degrades to a status the UI can render honestly rather than to a guess.
-actor ClaudeOAuthProvider: UsageProvider {
+actor ClaudeOAuthProvider: UsageProvider, ChangeSignalling {
     nonisolated let profile: ClaudeProfile
     nonisolated let id: String
     nonisolated let displayName: String
@@ -220,6 +220,15 @@ actor ClaudeOAuthProvider: UsageProvider {
     }
 
     nonisolated func forgetCachedCredential() { keychain.forgetCached() }
+
+    /// Moves when Claude Code renews its token (a new keychain item) or writes
+    /// a status line reading — the two moments a stale ring can become fresh.
+    /// Both are metadata: no secret is read and no prompt can appear.
+    nonisolated func changeStamp() -> Date? {
+        let stamps = [KeychainItem.modifiedAt(service: profile.keychainService),
+                      ClaudeStatusLineProvider(profile: profile).readingModifiedAt].compactMap { $0 }
+        return stamps.max()
+    }
 
     nonisolated func account() -> ProviderAccount? {
         // Settings renders on the main thread while an explicit read may be waiting on macOS.

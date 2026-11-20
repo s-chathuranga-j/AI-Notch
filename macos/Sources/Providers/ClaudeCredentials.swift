@@ -128,8 +128,13 @@ final class ClaudeKeychain: @unchecked Sendable {
     /// read an hour instead of two a minute.
     private let cache = CredentialCache<ClaudeCredentials> { $0.isExpired }
 
-    init(service: String) {
+    /// Where the learned token lifetime is kept. Only a duration — never the
+    /// token, never anything read from inside the item.
+    private let defaults: UserDefaults
+
+    init(service: String, defaults: UserDefaults = .standard) {
         self.service = service
+        self.defaults = defaults
     }
 
     convenience init(profile: ClaudeProfile) {
@@ -143,14 +148,61 @@ final class ClaudeKeychain: @unchecked Sendable {
     /// Reads whatever is stored, expired or not. Judging expiry is the caller's
     /// job, because "signed out" and "the token has aged out overnight" call for
     /// different behaviour and only one of them is worth alarming anyone about.
+    ///
+    /// Before a read that could prompt, this asks whether the token can still
+    /// be valid at all. Claude Code files a new item each time it renews, so the
+    /// newest item's modification date is when the token in it was issued, and
+    /// after one successful read we know how long such a token lasts. An item
+    /// older than that holds a token that has certainly expired: asking for the
+    /// password to read it could only end in "expired", so it is not asked. A
+    /// forced reload ("Allow access…") still always reads.
     func load(allowingInteraction: Bool = false, forceReload: Bool = false) throws -> ClaudeCredentials {
         try KeychainItem.withInteraction(allowed: allowingInteraction) {
-            if forceReload { cache.forget() }
-            return try cache.value(
-                itemModifiedAt: { KeychainItem.modifiedAt(service: service) },
+            if forceReload {
+                cache.forget()
+            } else if !(cache.cached.map { !$0.isExpired } ?? false),
+                      let lifetime = learnedLifetime,
+                      let issued = KeychainItem.modifiedAt(service: service),
+                      Self.mustHaveExpired(issuedAt: issued, lifetime: lifetime, now: Date()) {
+                throw UsageProviderError.credentialExpired
+            }
+            var stamp: Date?
+            let credentials = try cache.value(
+                itemModifiedAt: {
+                    stamp = KeychainItem.modifiedAt(service: service)
+                    return stamp
+                },
                 reload: { try ClaudeCredentials.read(service: service) }
             )
+            if let stamp, let lifetime = Self.lifetime(expiresAt: credentials.expiresAt,
+                                                       issuedAt: stamp, previous: learnedLifetime) {
+                defaults.set(lifetime, forKey: lifetimeKey)
+            }
+            return credentials
         }
+    }
+
+    private var lifetimeKey: String { "claudeTokenLifetime.\(service)" }
+
+    private var learnedLifetime: TimeInterval? {
+        let value = defaults.double(forKey: lifetimeKey)
+        return value > 0 ? value : nil
+    }
+
+    /// The longest lifetime seen. Longest, because an item rewritten after
+    /// its token was issued makes one observation look shorter than the
+    /// truth, and underestimating would skip a read that could have worked.
+    /// Values outside five minutes to thirty days are not believed.
+    static func lifetime(expiresAt: Date, issuedAt: Date, previous: TimeInterval?) -> TimeInterval? {
+        let observed = expiresAt.timeIntervalSince(issuedAt)
+        guard observed >= 5 * 60, observed <= 30 * 24 * 3600 else { return nil }
+        return max(observed, previous ?? 0)
+    }
+
+    /// True when a token issued at `issuedAt` cannot still be valid. A minute
+    /// of slack covers the gap between issuing and filing the item.
+    static func mustHaveExpired(issuedAt: Date, lifetime: TimeInterval, now: Date) -> Bool {
+        issuedAt.addingTimeInterval(lifetime + 60) <= now
     }
 
     var cachedCredential: ClaudeCredentials? { cache.cached }

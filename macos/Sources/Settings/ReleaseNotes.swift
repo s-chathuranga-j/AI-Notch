@@ -30,6 +30,12 @@ struct ReleaseNote: Equatable {
 /// `testTheCurrentVersionHasANote`.
 enum ReleaseNotes {
     static let all: [ReleaseNote] = [
+        ReleaseNote(version: "0.4.1", headline: "Claude without the pointless password prompts.", changes: [
+            .init(title: "No prompt for an expired token", detail: "When Claude Code’s token has certainly expired, AI Notch says so instead of asking for your password. The token renews the next time you use Claude Code."),
+            .init(title: "Says why Claude is stale", detail: "An expired token or a rate limit is named in the tooltip, with the time of the next try."),
+            .init(title: "Updates as soon as Claude Code renews", detail: "Claude refreshes within a minute of Claude Code renewing its token or writing a status line reading."),
+            .init(title: "History from day one", detail: "The seven-day chart appears from the first day with a reading and fills in as the week goes on.")
+        ]),
         ReleaseNote(version: "0.4.0", headline: "Hear about a limit before it stops you.", changes: [
             .init(title: "Usage alerts", detail: "When any limit reaches 90%, the notch comes out on its own, even when it is set to Show on hover or Hide, then goes back after a few seconds."),
             .init(title: "Choose how long it stays", detail: "Turn alerts off or set how many seconds they stay on screen in Settings → Alerts."),

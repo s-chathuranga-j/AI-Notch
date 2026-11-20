@@ -32,7 +32,8 @@ function insights(id,row){
  for(const w of row.windows||[]){
   const f=forecastFor(id,w);if(f)forecasts[w.label]=f;
   const days=dailyPeaks(history.samples(id,w.label)).map(d=>d.peak);
-  if(days.filter(p=>p!==null).length>=2)peaks[w.label]=days;
+  // Shown from the first day with a reading, so it is visibly building up rather than missing.
+  if(days.some(p=>p!==null))peaks[w.label]=days;
  }
  return {forecasts,history:peaks};
 }
