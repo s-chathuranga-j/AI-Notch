@@ -37,10 +37,10 @@ final class Preferences: ObservableObject {
         }
     }
 
-    static let alertSecondsRange = 3...60
-    static let defaultAlertSeconds = 10
+    nonisolated static let alertSecondsRange = 3...60
+    nonisolated static let defaultAlertSeconds = 10
 
-    static func clampAlertSeconds(_ value: Int) -> Int {
+    nonisolated static func clampAlertSeconds(_ value: Int) -> Int {
         min(max(value, alertSecondsRange.lowerBound), alertSecondsRange.upperBound)
     }
 
