@@ -15,9 +15,11 @@ class History{
   for(const w of row.windows){
    if(!Number.isFinite(w.percent))continue;
    const key=id+sep+w.label,list=this.series.get(key)||[];
-   const last=list.at(-1);
-   // Always keep a sample that drops (a reset) so the forecast can see the new window start.
-   if(last&&now-last[0]<SAMPLE_GAP&&w.percent>=last[1]){if(w.percent!==last[1]){last[1]=w.percent;changed=true;}continue;}
+   const last=list.at(-1),prev=list.at(-2);
+   // Within SAMPLE_GAP of the sample before it, the newest reading replaces the trailing one —
+   // with its own timestamp, so the series never backdates a reading. A drop (a reset) is always
+   // kept as a new sample so the forecast can see the new window start.
+   if(last&&prev&&now-prev[0]<SAMPLE_GAP&&w.percent>=last[1]){list[list.length-1]=[now,w.percent];changed=true;continue;}
    list.push([now,w.percent]);this.series.set(key,list);changed=true;
   }
   return this.prune(now)||changed;

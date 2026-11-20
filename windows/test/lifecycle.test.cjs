@@ -233,3 +233,14 @@ test('a ring choice per account is saved',async t=>{
  const ui=await boot(t);await ui.invoke('ring','claude','highest');assert.equal(ui.state().accounts[0].ring,'highest');
  await ui.invoke('ring','claude','auto');assert.equal(ui.state().accounts[0].ring,'auto');await ui.invoke('ring','nobody','highest');
 });
+test('alerts off silences notifications too, and leaves no notice for a later peek',async t=>{
+ const ui=await boot(t,{enabled:['claude'],saved:{alerts:false,systemNotifications:true},usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(ui.notifications.length,0);
+ ui.shortcuts.get('Control+Alt+N')();assert.equal(ui.state().alertKind,'peek');assert.equal(ui.state().accounts[0].notice,null);
+});
+test('changing visibility during an alert clears its notices',async t=>{
+ const ui=await boot(t,{enabled:['claude'],usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(ui.state().accounts[0].notice,'limit');
+ await ui.invoke('visibility','always');assert.equal(ui.state().alerting,false);
+ ui.shortcuts.get('Control+Alt+N')();assert.equal(ui.state().accounts[0].notice,null);
+});

@@ -67,4 +67,6 @@ class AlertTracker{
  }
  forget(id){const prefix=id+'\u001f';for(const key of [...this.state.keys()])if(key.startsWith(prefix))this.state.delete(key);}
 }
-module.exports={THRESHOLD,THRESHOLDS,ALERT_SECONDS,RECOVERED_BELOW,PACE,levelFor,accountLevel,clampAlertSeconds,cleanThresholds,isQuiet,AlertTracker};
+// A valid "HH:MM" (00:00–23:59), as stored for quiet hours.
+function validTime(text){return /^\d{2}:\d{2}$/.test(String(text))&&minutes(text)!==null;}
+module.exports={validTime,THRESHOLD,THRESHOLDS,ALERT_SECONDS,RECOVERED_BELOW,PACE,levelFor,accountLevel,clampAlertSeconds,cleanThresholds,isQuiet,AlertTracker};

@@ -3,10 +3,10 @@ const assert=require('node:assert/strict');
 const {History,forecast,dailyPeaks,MINUTE,HOUR,DAY}=require('../src/insights.cjs');
 const row=(percent,label='Session')=>({status:'Updated',windows:[{label,percent}]});
 const T0=new Date(2026,10,20,12,0).getTime();
-test('history keeps at most one sample per five minutes, but always a drop',()=>{
+test('history thins readings to about two per five minutes, with true timestamps, and keeps drops',()=>{
  const h=new History();
- h.add('c',row(10),T0);h.add('c',row(12),T0+MINUTE);h.add('c',row(15),T0+6*MINUTE);
- assert.deepEqual(h.samples('c','Session'),[[T0,12],[T0+6*MINUTE,15]]);
+ for(const m of [0,1,2,3,4,6])h.add('c',row(10+m),T0+m*MINUTE);
+ assert.deepEqual(h.samples('c','Session'),[[T0,10],[T0+4*MINUTE,14],[T0+6*MINUTE,16]]);
  h.add('c',row(2),T0+7*MINUTE);assert.equal(h.samples('c','Session').at(-1)[1],2);
 });
 test('history ignores stale rows, prunes old samples, forgets accounts and round-trips',()=>{

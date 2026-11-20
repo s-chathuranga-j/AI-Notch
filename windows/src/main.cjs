@@ -4,7 +4,8 @@ const fs=require('node:fs/promises');const path=require('node:path');const os=re
 const {discover,Poller,fetchUsage,claudeStatusLineSettings,claudeReadingFile}=require('./providers.cjs');
 const {notchBounds}=require('./layout.cjs');
 const {record}=require('./diagnostics.cjs');
-const {AlertTracker,accountLevel,clampAlertSeconds,cleanThresholds,isQuiet,ALERT_SECONDS}=require('./alerts.cjs');
+const {AlertTracker,accountLevel,clampAlertSeconds,cleanThresholds,isQuiet,validTime,ALERT_SECONDS}=require('./alerts.cjs');
+const fsSync=require('node:fs');
 const {History,forecast,dailyPeaks}=require('./insights.cjs');
 const SHORTCUTS=['off','Control+Alt+N','Control+Alt+U','Control+Shift+Space'];
 const NOTICE_RANK={peek:0,reset:1,pace:2,limit:3};
@@ -49,6 +50,9 @@ function state(){return {demo,settings,expanded,detailId,alerting,alertKind,posi
 function onReading(id,row){
  if(!poller.enabled.has(id))return;
  if(!demo&&history.add(id,row))saveHistorySoon();
+ // Alerts off silences everything, notifications included. During quiet hours the tracker is not
+ // told either, so a limit that is still high when they end is announced then, not lost.
+ if(!config.alerts||isQuiet(config.quiet))return;
  const result=alerts.update(id,row,config.alertThresholds);
  let kind=null,detail=null;
  if(result.crossed.length){kind='limit';detail=result.crossed.at(-1);}
@@ -57,10 +61,9 @@ function onReading(id,row){
  }
  if(!kind&&result.recovered.length){kind='reset';detail=result.recovered[0];}
  if(!kind)return;
- if(isQuiet(config.quiet))return;
  notices.set(id,kind);
  notify(id,kind,detail);
- if(config.alerts)startAlert(kind);
+ startAlert(kind);
 }
 function notify(id,kind,detail){
  if(!config.systemNotifications||!Notification?.isSupported?.())return;
@@ -84,12 +87,27 @@ function saveHistorySoon(){
  if(historyTimer)return;
  historyTimer=setTimeout(()=>{historyTimer=null;saveHistory().catch(()=>log('history-save-failed'));},60000);
 }
-async function saveHistory(){
- if(demo)return;
+// Writes are chained, like save(), so two can never interleave on history.json.tmp.
+let historySaving=Promise.resolve();
+function saveHistory(){
+ if(demo)return Promise.resolve();
  const directory=app.getPath('userData'),file=path.join(directory,'history.json');
- await fs.mkdir(directory,{recursive:true});
- await fs.writeFile(file+'.tmp',JSON.stringify(history),{mode:0o600});
- await fs.rename(file+'.tmp',file);
+ historySaving=historySaving.catch(()=>{}).then(async()=>{
+  await fs.mkdir(directory,{recursive:true});
+  await fs.writeFile(file+'.tmp',JSON.stringify(history),{mode:0o600});
+  await fs.rename(file+'.tmp',file);
+ });
+ return historySaving;
+}
+// On the way out there is no time for an async write to land, so the last one is synchronous.
+function saveHistoryNow(){
+ if(demo)return;
+ try{
+  const directory=app.getPath('userData'),file=path.join(directory,'history.json');
+  fsSync.mkdirSync(directory,{recursive:true});
+  fsSync.writeFileSync(file+'.tmp',JSON.stringify(history),{mode:0o600});
+  fsSync.renameSync(file+'.tmp',file);
+ }catch{log('history-save-failed');}
 }
 function registerShortcut(){
  if(!globalShortcut)return;
@@ -99,7 +117,7 @@ function registerShortcut(){
  let ok=false;try{ok=globalShortcut.register(config.peekShortcut,peek);}catch{}
  if(!ok)shortcutError='Another app is using this shortcut. Choose a different one.';
 }
-function endAlert(){clearTimeout(alertTimer);alertTimer=null;if(!alerting)return;alerting=false;alertKind=null;notices.clear();place();push();}
+function endAlert(){clearTimeout(alertTimer);alertTimer=null;notices.clear();alertKind=null;if(!alerting)return;alerting=false;place();push();}
 function push(){
  if(app.quitting||!win||win.isDestroyed()||win.webContents.isDestroyed())return;
  try{win.webContents.send('state',state());}catch{log('renderer-gone');}
@@ -127,7 +145,7 @@ function save(){
  return saving;
 }
 async function refresh(){await Promise.all(accounts.map(a=>poller.refresh(a)));}
-function stop(){if(!app.quitting&&historyTimer){clearTimeout(historyTimer);historyTimer=null;saveHistory().catch(()=>{});}app.quitting=true;clearTimeout(wakeTimer);clearTimeout(alertTimer);try{globalShortcut?.unregisterAll();}catch{}clearInterval(refreshTimer);poller.cancelPending();}
+function stop(){if(!app.quitting&&historyTimer){clearTimeout(historyTimer);historyTimer=null;saveHistoryNow();}app.quitting=true;clearTimeout(wakeTimer);clearTimeout(alertTimer);try{globalShortcut?.unregisterAll();}catch{}clearInterval(refreshTimer);poller.cancelPending();}
 function fatal(event,error){
  if(app.quitting)return;
  log(event,error?.code);stop();
@@ -193,7 +211,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
    try{const saved=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'settings.json'),'utf8'));config.enabled=Array.isArray(saved.enabled)?saved.enabled.filter(x=>typeof x==='string'):[];if(['top','bottom','left','right'].includes(saved.position))config.position=saved.position;if(VISIBILITIES.includes(saved.visibility))config.visibility=saved.visibility;if(typeof saved.alerts==='boolean')config.alerts=saved.alerts;if(saved.alertSeconds!==undefined)config.alertSeconds=clampAlertSeconds(saved.alertSeconds);
     if(saved.alertThresholds!==undefined)config.alertThresholds=cleanThresholds(saved.alertThresholds);
     if(typeof saved.paceAlerts==='boolean')config.paceAlerts=saved.paceAlerts;
-    if(saved.quiet&&typeof saved.quiet==='object')config.quiet={enabled:saved.quiet.enabled===true,start:String(saved.quiet.start||'22:00').slice(0,5),end:String(saved.quiet.end||'08:00').slice(0,5)};
+    if(saved.quiet&&typeof saved.quiet==='object')config.quiet={enabled:saved.quiet.enabled===true,start:validTime(saved.quiet.start)?saved.quiet.start:'22:00',end:validTime(saved.quiet.end)?saved.quiet.end:'08:00'};
     if(typeof saved.systemNotifications==='boolean')config.systemNotifications=saved.systemNotifications;
     if(SHORTCUTS.includes(saved.peekShortcut))config.peekShortcut=saved.peekShortcut;
     if(typeof saved.display==='string')config.display=saved.display;
@@ -208,7 +226,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   createWindow();
   function valid(event){return win&&!win.isDestroyed()&&event.sender===win.webContents&&event.senderFrame===win.webContents.mainFrame;}
   ipcMain.handle('state',event=>valid(event)?state():null);
-  ipcMain.handle('toggle',async(event,id,on)=>{if(!valid(event)||typeof on!=='boolean')return;const a=accounts.find(a=>a.id===id);if(!a)return;if(on){poller.enabled.add(id);rows[id]={status:'Loading…',windows:[]};}else {poller.disable(id);alerts.forget(id);if(history.forget(id))saveHistory().catch(()=>log('history-save-failed'));}config.enabled=[...poller.enabled];await save();if(!on&&!demo&&a.kind==='claude')await fs.rm(path.join(a.dir,claudeReadingFile),{force:true}).catch(()=>{});push();if(on)await poller.refresh(a);});
+  ipcMain.handle('toggle',async(event,id,on)=>{if(!valid(event)||typeof on!=='boolean')return;const a=accounts.find(a=>a.id===id);if(!a)return;if(on){poller.enabled.add(id);rows[id]={status:'Loading…',windows:[]};}else {poller.disable(id);alerts.forget(id);notices.delete(id);if(history.forget(id))saveHistory().catch(()=>log('history-save-failed'));}config.enabled=[...poller.enabled];await save();if(!on&&!demo&&a.kind==='claude')await fs.rm(path.join(a.dir,claudeReadingFile),{force:true}).catch(()=>{});push();if(on)await poller.refresh(a);});
   ipcMain.handle('claude-status-line', (event,id) => {
    if(!valid(event)||demo)return false;
    const account=accounts.find(a=>a.id===id&&a.kind==='claude');
@@ -218,7 +236,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   });
   ipcMain.handle('retry',event=>{if(valid(event))return refresh();});
   ipcMain.handle('position',async(event,value)=>{if(valid(event)&&['top','bottom','left','right'].includes(value)){config.position=value;await save();place();push();}});
-  ipcMain.handle('visibility',async(event,value)=>{if(valid(event)&&VISIBILITIES.includes(value)){config.visibility=value;expanded=value==='always';detailId=null;clearTimeout(alertTimer);alerting=false;await save();place();push();}});
+  ipcMain.handle('visibility',async(event,value)=>{if(valid(event)&&VISIBILITIES.includes(value)){config.visibility=value;expanded=value==='always';detailId=null;endAlert();await save();place();push();}});
   ipcMain.handle('alerts',async(event,value)=>{
    if(!valid(event)||!value||typeof value!=='object')return;
    if(typeof value.enabled==='boolean'){config.alerts=value.enabled;if(!value.enabled&&alerting)endAlert();}
@@ -226,7 +244,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
    if(value.thresholds!==undefined)config.alertThresholds=cleanThresholds(value.thresholds);
    if(typeof value.pace==='boolean')config.paceAlerts=value.pace;
    if(typeof value.notifications==='boolean')config.systemNotifications=value.notifications;
-   if(value.quiet&&typeof value.quiet==='object'){const q=value.quiet;config.quiet={enabled:typeof q.enabled==='boolean'?q.enabled:config.quiet.enabled,start:/^\d{2}:\d{2}$/.test(q.start)?q.start:config.quiet.start,end:/^\d{2}:\d{2}$/.test(q.end)?q.end:config.quiet.end};}
+   if(value.quiet&&typeof value.quiet==='object'){const q=value.quiet;config.quiet={enabled:typeof q.enabled==='boolean'?q.enabled:config.quiet.enabled,start:validTime(q.start)?q.start:config.quiet.start,end:validTime(q.end)?q.end:config.quiet.end};}
    await save();push();
   });
   ipcMain.handle('display',async(event,value)=>{if(valid(event)&&typeof value==='string'&&(value==='primary'||displays().some(d=>d.id===value))){config.display=value;await save();place();push();}});

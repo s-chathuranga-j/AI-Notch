@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-let current,timer,selected=null,isExpanded=false;
+let current,timer,selected=null,isExpanded=false,displayKey='';
 function text(tag,value,className){const el=document.createElement(tag);el.textContent=value;if(className)el.className=className;return el;}
 function logo(kind){
  const img=document.createElement('img');
@@ -19,14 +19,14 @@ function forecastLine(f){
  return text('small',`At this pace: runs out ${when}${tail}`,f.beforeReset===true?'forecast soon':'forecast');
 }
 // Seven bars, one per day, each the highest reading that day. Days with no reading stay empty.
-function historyChart(peaks,days,label){
+function historyChart(peaks,days,label,guide=90){
  const ns='http://www.w3.org/2000/svg',w=280,h=44,bw=26,gap=(w-7*bw)/6;
  const box=text('div','','history');
  const known=peaks.filter(p=>p!==null);
  const head=text('div','','history-head');head.append(text('span',`${label} peak · 7 days`),text('span',`avg ${Math.round(known.reduce((a,b)=>a+b,0)/known.length)}%`));
  const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox',`0 0 ${w} ${h+13}`);svg.setAttribute('role','img');
  svg.setAttribute('aria-label',`${label} daily peaks: `+peaks.map((p,i)=>`${new Date(days[i]).toLocaleDateString([],{weekday:'short'})} ${p===null?'no data':Math.round(p)+'%'}`).join(', '));
- const line=document.createElementNS(ns,'line');for(const [k,v] of Object.entries({x1:0,x2:w,y1:h-h*.9,y2:h-h*.9,class:'history-line'}))line.setAttribute(k,String(v));svg.append(line);
+ const line=document.createElementNS(ns,'line');for(const [k,v] of Object.entries({x1:0,x2:w,y1:h-h*guide/100,y2:h-h*guide/100,class:'history-line'}))line.setAttribute(k,String(v));svg.append(line);
  peaks.forEach((p,i)=>{
   const x=i*(bw+gap);
   if(p!==null){const r=document.createElementNS(ns,'rect'),bh=Math.max(2,h*Math.min(100,p)/100),level=levelFor(p);
@@ -76,11 +76,16 @@ function render(state){
  const quiet=state.quiet||{};$('quiet').checked=!!quiet.enabled;$('quiet-start').value=quiet.start||'22:00';$('quiet-end').value=quiet.end||'08:00';
  $('quiet-start').disabled=$('quiet-end').disabled=!quiet.enabled;
  $('notifications').checked=!!state.systemNotifications;$('notifications').disabled=!state.notificationsAvailable;
- for(const id of ['pace','alert-seconds'])$(id).disabled=state.alerts===false;
+ for(const id of ['pace','alert-seconds','quiet'])$(id).disabled=state.alerts===false;
+ if(state.alerts===false)$('notifications').disabled=$('quiet-start').disabled=$('quiet-end').disabled=true;
  $('shortcut').value=state.peekShortcut||'off';$('shortcut-status').textContent=state.shortcutError||(state.peekShortcut&&state.peekShortcut!=='off'?'Shows the notch for a few seconds from anywhere.':'');
- const display=$('display');if(display.replaceChildren){display.replaceChildren();const main=document.createElement('option');main.value='primary';main.textContent='Main display';display.append(main);
-  for(const d of state.displays||[]){if((state.displays||[]).length<2)break;const o=document.createElement('option');o.value=d.id;o.textContent=d.label;display.append(o);}}
- display.value=state.display||'primary';display.disabled=(state.displays||[]).length<2;
+ // Rebuilt only when the displays change, so a poll cannot close the list while it is open.
+ const display=$('display'),list=(state.displays||[]).length>1?state.displays:[];
+ const key=list.map(d=>d.id+d.label).join('|');
+ if(key!==displayKey&&display.replaceChildren){displayKey=key;display.replaceChildren();const main=document.createElement('option');main.value='primary';main.textContent='Main display';display.append(main);
+  for(const d of list){const o=document.createElement('option');o.value=d.id;o.textContent=d.label;display.append(o);}}
+ // A saved display that is no longer connected falls back to the main one, as the notch does.
+ display.value=list.some(d=>d.id===state.display)?state.display:'primary';display.disabled=!list.length;
  $('startup').checked=!!state.startWithWindows;$('startup').disabled=!state.startupAvailable;
  $('startup-status').textContent=state.startupError||(state.startupAvailable?'':'Available in the installed Windows app.');
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
@@ -121,7 +126,7 @@ function render(state){
     if(!stale&&a.forecasts?.[w.label])row.append(forecastLine(a.forecasts[w.label]));
    }
    const ringed=ringWindow(a);
-   if(!stale&&!state.settings&&ringed&&a.history?.[ringed.label]&&state.historyDays)row.append(historyChart(a.history[ringed.label],state.historyDays,ringed.label));
+   if(!stale&&!state.settings&&ringed&&a.history?.[ringed.label]&&state.historyDays)row.append(historyChart(a.history[ringed.label],state.historyDays,ringed.label,Math.min(...(state.alertThresholds||[90]))));
    if(!stale)row.append(text('small',a.status==='Updated'?`Updated ${new Date(a.updated).toLocaleTimeString()}`:a.status,'status'));
   }else row.append(text('small','Disabled · enable in settings'));
   $('accounts').append(row);
