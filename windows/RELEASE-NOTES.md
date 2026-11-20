@@ -1,4 +1,16 @@
-# AI Notch for Windows v0.3.7 — Preview
+# AI Notch for Windows v0.3.8 — Preview
+
+AI Notch now tells you when a limit is about to run out.
+
+- **Usage alerts.** When any limit reaches 90%, the notch comes out on its own, even in On hover or Hidden mode. The account shows in yellow, or red at 100%. The notch stays out for the number of seconds you choose (default 10, 3–60), then returns to your visibility setting. Each crossing alerts once and re-arms after the limit resets. Turn alerts off with **Alert at 90% usage** in Settings.
+- **A tidier notch.** Details and settings stay clear of the notch's curved edges on every screen edge, including while scrolling. The ring row is centred, the left and right rails are evenly spaced, and on side edges the details card sits beside the ring you hover.
+- **A visible settings gear.** The settings button now always shows a gear instead of a partial arc.
+
+The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs and SHA-256 checksums are included. This is an unsigned preview.
+
+All 60 tests passed. Native installer execution and live alerts on Windows remain unverified.
+
+## Earlier release: Windows v0.3.7
 
 AI Notch now shows **Spend limit** when Claude Code reports it through the status line, including accounts with no five-hour or weekly reading.
 

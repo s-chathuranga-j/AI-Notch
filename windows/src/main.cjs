@@ -3,13 +3,15 @@ const fs=require('node:fs/promises');const path=require('node:path');const os=re
 const {discover,Poller,fetchUsage,claudeStatusLineSettings,claudeReadingFile}=require('./providers.cjs');
 const {notchBounds}=require('./layout.cjs');
 const {record}=require('./diagnostics.cjs');
+const {AlertTracker,accountLevel,clampAlertSeconds,ALERT_SECONDS}=require('./alerts.cjs');
 const demo=process.platform!=='win32'||process.argv.includes('--demo');
 const icon=path.join(__dirname,process.platform==='win32'?'assets/app.ico':'tray.png');
 const VISIBILITIES=['onHover','always','hidden'];
 const loginOptions={path:process.execPath,args:['--startup']};
-let win,tray,wakeTimer,refreshTimer,startupError='',lastRendererRecovery=0;
-let accounts=[],config={enabled:[],position:'top',visibility:'onHover'},rows={},settings=false,expanded=false,detailId=null;
-const poller=new Poller(demo?async account=>account.kind==='copilot'?[{label:'AI credits',percent:28,reset:new Date(Date.now()+604800000).toISOString()},{label:'Completions',percent:null,unlimited:true,reset:null}]:[{label:'Session',percent:account.kind==='claude'?37:62,reset:new Date(Date.now()+7200000).toISOString()},{label:'Weekly',percent:21,reset:null}]:fetchUsage,(id,row)=>{rows[id]=row;push();});
+let win,tray,wakeTimer,refreshTimer,alertTimer,startupError='',lastRendererRecovery=0,alerting=false;
+const alerts=new AlertTracker();
+let accounts=[],config={enabled:[],position:'top',visibility:'onHover',alerts:true,alertSeconds:ALERT_SECONDS.default},rows={},settings=false,expanded=false,detailId=null;
+const poller=new Poller(demo?async account=>account.kind==='copilot'?[{label:'AI credits',percent:28,reset:new Date(Date.now()+604800000).toISOString()},{label:'Completions',percent:null,unlimited:true,reset:null}]:[{label:'Session',percent:account.kind==='claude'?37:62,reset:new Date(Date.now()+7200000).toISOString()},{label:'Weekly',percent:21,reset:null}]:fetchUsage,(id,row)=>{rows[id]=row;if(alerts.update(id,row)&&config.alerts&&poller.enabled.has(id))startAlert();push();});
 function log(event,code){record(app.getPath('userData'),event,code);}
 function startupState(){
  const startupAvailable=process.platform==='win32'&&app.isPackaged&&!demo;
@@ -17,18 +19,27 @@ function startupState(){
  try{return {startupAvailable:true,startWithWindows:app.getLoginItemSettings(loginOptions).executableWillLaunchAtLogin,startupError};}
  catch{return {startupAvailable:false,startWithWindows:false,startupError:'Windows startup settings could not be read.'};}
 }
-function state(){return {demo,settings,expanded,detailId,position:config.position,visibility:config.visibility,...startupState(),accounts:accounts.map(({id,label,kind})=>({id,label,kind,enabled:poller.enabled.has(id),...(rows[id]||{status:'Disabled',windows:[]})}))};}
+function state(){return {demo,settings,expanded,detailId,alerting,position:config.position,visibility:config.visibility,alerts:config.alerts,alertSeconds:config.alertSeconds,...startupState(),accounts:accounts.map(({id,label,kind})=>{const account={id,label,kind,enabled:poller.enabled.has(id),...(rows[id]||{status:'Disabled',windows:[]})};return {...account,level:accountLevel(account)};})};}
+// A limit reaching 90% brings the notch out on its own — folded or hidden — for the chosen number
+// of seconds, then place() returns it to the visibility the user picked.
+function startAlert(){
+ if(app.quitting||config.visibility==='always')return;
+ alerting=true;clearTimeout(alertTimer);
+ alertTimer=setTimeout(endAlert,config.alertSeconds*1000);
+ place();
+}
+function endAlert(){clearTimeout(alertTimer);alertTimer=null;if(!alerting)return;alerting=false;place();push();}
 function push(){
  if(app.quitting||!win||win.isDestroyed()||win.webContents.isDestroyed())return;
  try{win.webContents.send('state',state());}catch{log('renderer-gone');}
 }
 function place(){
  if(!win||win.isDestroyed()||app.quitting)return;
- const open=expanded||config.visibility==='always';
+ const open=expanded||alerting||config.visibility==='always';
  const area=screen.getPrimaryDisplay().workArea;
  if(area.width<=0||area.height<=0)return;
  win.setBounds(notchBounds(area,config.position,accounts.length,open,settings,detailId!==null));
- const hidden=config.visibility==='hidden'&&!settings;
+ const hidden=config.visibility==='hidden'&&!settings&&!alerting;
  win.setIgnoreMouseEvents(hidden);
  if(hidden)win.hide();else if(!win.isVisible())win.showInactive();
 }
@@ -45,7 +56,7 @@ function save(){
  return saving;
 }
 async function refresh(){await Promise.all(accounts.map(a=>poller.refresh(a)));}
-function stop(){app.quitting=true;clearTimeout(wakeTimer);clearInterval(refreshTimer);poller.cancelPending();}
+function stop(){app.quitting=true;clearTimeout(wakeTimer);clearTimeout(alertTimer);clearInterval(refreshTimer);poller.cancelPending();}
 function fatal(event,error){
  if(app.quitting)return;
  log(event,error?.code);stop();
@@ -108,7 +119,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   if(demo){accounts=[{id:'claude',kind:'claude',label:'Claude · Personal'},{id:'claude-work',kind:'claude',label:'Claude · Work'},{id:'codex',kind:'codex',label:'Codex'},{id:'copilot',kind:'copilot',label:'GitHub Copilot'}];config.enabled=accounts.map(a=>a.id);}
   else {
    accounts=await discover(os.homedir());
-   try{const saved=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'settings.json'),'utf8'));config.enabled=Array.isArray(saved.enabled)?saved.enabled.filter(x=>typeof x==='string'):[];if(['top','bottom','left','right'].includes(saved.position))config.position=saved.position;if(VISIBILITIES.includes(saved.visibility))config.visibility=saved.visibility;}catch{}
+   try{const saved=JSON.parse(await fs.readFile(path.join(app.getPath('userData'),'settings.json'),'utf8'));config.enabled=Array.isArray(saved.enabled)?saved.enabled.filter(x=>typeof x==='string'):[];if(['top','bottom','left','right'].includes(saved.position))config.position=saved.position;if(VISIBILITIES.includes(saved.visibility))config.visibility=saved.visibility;if(typeof saved.alerts==='boolean')config.alerts=saved.alerts;if(saved.alertSeconds!==undefined)config.alertSeconds=clampAlertSeconds(saved.alertSeconds);}catch{}
   }
   config.enabled.forEach(id=>poller.enabled.add(id));
   session.defaultSession.webRequest.onBeforeRequest((details,callback)=>callback({cancel:!details.url.startsWith('file:')}));
@@ -118,7 +129,7 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   createWindow();
   function valid(event){return win&&!win.isDestroyed()&&event.sender===win.webContents&&event.senderFrame===win.webContents.mainFrame;}
   ipcMain.handle('state',event=>valid(event)?state():null);
-  ipcMain.handle('toggle',async(event,id,on)=>{if(!valid(event)||typeof on!=='boolean')return;const a=accounts.find(a=>a.id===id);if(!a)return;if(on){poller.enabled.add(id);rows[id]={status:'Loading…',windows:[]};}else poller.disable(id);config.enabled=[...poller.enabled];await save();if(!on&&!demo&&a.kind==='claude')await fs.rm(path.join(a.dir,claudeReadingFile),{force:true}).catch(()=>{});push();if(on)await poller.refresh(a);});
+  ipcMain.handle('toggle',async(event,id,on)=>{if(!valid(event)||typeof on!=='boolean')return;const a=accounts.find(a=>a.id===id);if(!a)return;if(on){poller.enabled.add(id);rows[id]={status:'Loading…',windows:[]};}else {poller.disable(id);alerts.forget(id);}config.enabled=[...poller.enabled];await save();if(!on&&!demo&&a.kind==='claude')await fs.rm(path.join(a.dir,claudeReadingFile),{force:true}).catch(()=>{});push();if(on)await poller.refresh(a);});
   ipcMain.handle('claude-status-line', (event,id) => {
    if(!valid(event)||demo)return false;
    const account=accounts.find(a=>a.id===id&&a.kind==='claude');
@@ -128,7 +139,13 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   });
   ipcMain.handle('retry',event=>{if(valid(event))return refresh();});
   ipcMain.handle('position',async(event,value)=>{if(valid(event)&&['top','bottom','left','right'].includes(value)){config.position=value;await save();place();push();}});
-  ipcMain.handle('visibility',async(event,value)=>{if(valid(event)&&VISIBILITIES.includes(value)){config.visibility=value;expanded=value==='always';detailId=null;await save();place();push();}});
+  ipcMain.handle('visibility',async(event,value)=>{if(valid(event)&&VISIBILITIES.includes(value)){config.visibility=value;expanded=value==='always';detailId=null;clearTimeout(alertTimer);alerting=false;await save();place();push();}});
+  ipcMain.handle('alerts',async(event,value)=>{
+   if(!valid(event)||!value||typeof value!=='object')return;
+   if(typeof value.enabled==='boolean'){config.alerts=value.enabled;if(!value.enabled&&alerting)endAlert();}
+   if(value.seconds!==undefined)config.alertSeconds=clampAlertSeconds(value.seconds);
+   await save();push();
+  });
   ipcMain.handle('startup',(event,value)=>{
    if(!valid(event)||typeof value!=='boolean'||!startupState().startupAvailable)return;
    try{app.setLoginItemSettings({...loginOptions,name:'AI Notch',openAtLogin:value,enabled:value});startupError='';}

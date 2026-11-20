@@ -40,6 +40,10 @@ final class NotchWindowController {
     /// twitchy rather than responsive.
     private let foldGrace: TimeInterval = 0.45
     private var foldWork: DispatchWorkItem?
+    /// Ends a usage alert. Replaced, not stacked, when another alert arrives.
+    private var alertWork: DispatchWorkItem?
+    /// The standing choice from Settings, so an alert knows what to return to.
+    private(set) var visibility: NotchVisibility = .onHover
     /// Whether we have pushed the pointing hand onto the cursor stack.
     private var isPointing = false
     /// The usable area the panel was last placed against.
@@ -86,6 +90,7 @@ final class NotchWindowController {
 
     func stop() {
         setPointing(false)
+        alertWork?.cancel()
         foldWork?.cancel()
         cursorTimer?.invalidate()
         cursorTimer = nil
@@ -352,12 +357,12 @@ final class NotchWindowController {
             return
         }
 
-        guard model.isExpanded, !model.staysOpen, foldWork == nil else { return }
+        guard model.isExpanded, !model.staysOpen, !model.isAlerting, foldWork == nil else { return }
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.foldWork = nil
-                guard !self.model.staysOpen else { return }
+                guard !self.model.staysOpen, !self.model.isAlerting else { return }
                 withAnimation(NotchMotion.unfold) {
                     self.model.isExpanded = false
                     self.model.hoveredIndex = nil
@@ -489,6 +494,11 @@ final class NotchWindowController {
     private var edgeChange = 0
 
     func apply(_ visibility: NotchVisibility) {
+        // A new standing choice replaces whatever an alert was holding open.
+        self.visibility = visibility
+        alertWork?.cancel()
+        alertWork = nil
+        model.isAlerting = false
         switch visibility {
         case .alwaysShow:
             panel?.orderFrontRegardless()
@@ -520,6 +530,55 @@ final class NotchWindowController {
             panel?.orderOut(nil)
         }
         setPointing(false)
+        updateInteractiveRects()
+    }
+
+    // MARK: - Usage alerts
+
+    /// Bring the notch out unasked, because a limit has nearly run out.
+    ///
+    /// A pill at the edge, or nothing at all, is easy to never look at — so a
+    /// limit about to stop your work opens the notch, with its rings in their
+    /// warning colours, for `duration` seconds. Then it goes back to whatever
+    /// Settings says: folded for Show on hover, off screen for Hide. Always
+    /// show is already open, so there is nothing to announce.
+    func announceUsageAlert(duration: TimeInterval) {
+        guard visibility != .alwaysShow else { return }
+        alertWork?.cancel()
+        foldWork?.cancel()
+        foldWork = nil
+        model.isAlerting = true
+        if visibility == .hidden { panel?.orderFrontRegardless() }
+        withAnimation(NotchMotion.unfold) { model.isExpanded = true }
+        updateInteractiveRects()
+
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.endUsageAlert() }
+        }
+        alertWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(1, duration), execute: work)
+    }
+
+    private func endUsageAlert() {
+        alertWork = nil
+        guard model.isAlerting else { return }
+        model.isAlerting = false
+        switch visibility {
+        case .alwaysShow:
+            break
+        case .onHover:
+            // The pointer decides from here, as it always does: if it is on
+            // the notch it stays open, otherwise it folds after the usual grace.
+            cursorMoved()
+        case .hidden:
+            model.isPinned = false
+            withAnimation(NotchMotion.unfold) {
+                model.isExpanded = false
+                model.hoveredIndex = nil
+            }
+            setPointing(false)
+            panel?.orderOut(nil)
+        }
         updateInteractiveRects()
     }
 

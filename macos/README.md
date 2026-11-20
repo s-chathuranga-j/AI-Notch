@@ -8,6 +8,7 @@ A native macOS companion that places AI coding usage and session activity on a s
 - Busy and waiting indicators for supported coding sessions.
 - Top, bottom, left or right placement, including hardware-notch alignment.
 - Hover expansion, always-visible and hidden modes.
+- Usage alerts: when any limit reaches 90%, the notch opens on its own (even from Show on hover or Hide) for a configurable number of seconds (default 10, 3–60), then returns to the chosen mode. Each crossing is announced once and re-arms after the window resets. Toggle and duration live in Settings → Appearance.
 - Provider controls, launch at login, Dock and menu-bar options.
 - Explicit stale, unavailable and authentication states when readings fail.
 

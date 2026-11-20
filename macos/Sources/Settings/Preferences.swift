@@ -20,6 +20,30 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(notchVisibility.rawValue, forKey: Keys.visibility) }
     }
 
+    /// Whether the notch comes out on its own when a limit reaches 90%.
+    @Published var usageAlertsEnabled: Bool {
+        didSet { defaults.set(usageAlertsEnabled, forKey: Keys.alerts) }
+    }
+
+    /// How long, in seconds, an alert holds the notch open before it goes
+    /// back to the way Settings says it should look.
+    @Published var usageAlertSeconds: Int {
+        didSet {
+            // Assigning inside `didSet` does not re-enter it, so the clamped
+            // value is written on this same pass.
+            let clamped = Self.clampAlertSeconds(usageAlertSeconds)
+            if clamped != usageAlertSeconds { usageAlertSeconds = clamped }
+            defaults.set(usageAlertSeconds, forKey: Keys.alertSeconds)
+        }
+    }
+
+    static let alertSecondsRange = 3...60
+    static let defaultAlertSeconds = 10
+
+    static func clampAlertSeconds(_ value: Int) -> Int {
+        min(max(value, alertSecondsRange.lowerBound), alertSecondsRange.upperBound)
+    }
+
     /// Which screen edge the notch is welded to.
     @Published var notchEdge: NotchEdge {
         didSet { defaults.set(notchEdge.rawValue, forKey: Keys.edge) }
@@ -59,6 +83,8 @@ final class Preferences: ObservableObject {
         static let presence = "appPresence"
         static let edge = "notchEdge"
         static let lastSeenVersion = "lastSeenVersion"
+        static let alerts = "usageAlertsEnabled"
+        static let alertSeconds = "usageAlertSeconds"
     }
 
     /// True the very first time this copy runs, and never again.
@@ -111,6 +137,12 @@ final class Preferences: ObservableObject {
         // like it failed to start.
         self.notchVisibility = defaults.string(forKey: Keys.visibility)
             .flatMap(NotchVisibility.init(rawValue:)) ?? .onHover
+        // On unless turned off: the point is to hear about a limit you were
+        // not watching, and an opt-in alert is one nobody finds until too late.
+        self.usageAlertsEnabled = defaults.object(forKey: Keys.alerts) as? Bool ?? true
+        self.usageAlertSeconds = Self.clampAlertSeconds(
+            defaults.object(forKey: Keys.alertSeconds) as? Int ?? Self.defaultAlertSeconds
+        )
         // Absent means never chosen. The Dock is the default because it is the
         // findable one — a new user who cannot see the app anywhere has no way
         // to learn it is running.

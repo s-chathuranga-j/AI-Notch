@@ -11,7 +11,7 @@ const plain=value=>JSON.parse(JSON.stringify(value));
 async function boot(t,options={}){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'ainotch-life-'));
  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
- fs.writeFileSync(path.join(directory,'settings.json'),JSON.stringify({enabled:[],position:'right',visibility:options.visibility||'onHover'}));
+ fs.writeFileSync(path.join(directory,'settings.json'),JSON.stringify({enabled:options.enabled||[],position:'right',visibility:options.visibility||'onHover',...options.saved}));
  const app=new EventEmitter(),ipc=new EventEmitter(),power=new EventEmitter(),screen=new EventEmitter(),processMock=new EventEmitter();
  const windows=[],trays=[],handlers=new Map(),ready=[],timers=new Map(),intervals=new Map(),exits=[],relaunches=[],dialogs=[],loginWrites=[];
  let nextTimer=0,approved=options.approved!==false,registered=!!options.registered;
@@ -50,7 +50,7 @@ async function boot(t,options={}){
  Object.assign(processMock,{platform:options.platform||'win32',argv:['AI Notch.exe',...(options.args||[])],execPath:'C:\\Users\\Example\\AppData\\Local\\Programs\\AI Notch\\AI Notch.exe'});
  const electron={app,ipcMain:ipc,powerMonitor:power,screen,BrowserWindow:Window,Tray,Menu:{buildFromTemplate:items=>items},session:{defaultSession:{webRequest:{onBeforeRequest(){}}}},dialog:{showErrorBox:(...args)=>dialogs.push(args)}};
  const context={
-  require:name=>name==='electron'?electron:name==='./providers.cjs'?{Poller,discover:async()=>{if(options.discoveryFails)throw new Error('Bearer synthetic-secret');return [{id:'claude',kind:'claude',label:'Claude',dir:'/synthetic'}];},fetchUsage:async()=>[]}:name.startsWith('./')?require('../src/'+name.slice(2)):require(name),
+  require:name=>name==='electron'?electron:name==='./providers.cjs'?{Poller,discover:async()=>{if(options.discoveryFails)throw new Error('Bearer synthetic-secret');return [{id:'claude',kind:'claude',label:'Claude',dir:'/synthetic'}];},fetchUsage:async()=>options.usage?options.usage():[]}:name.startsWith('./')?require('../src/'+name.slice(2)):require(name),
   process:processMock,__dirname:path.dirname(require.resolve('../src/main.cjs')),
   setTimeout:fn=>{const id=++nextTimer;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id),
   setInterval:fn=>{const id=++nextTimer;intervals.set(id,fn);return id;},clearInterval:id=>intervals.delete(id)
@@ -151,6 +151,36 @@ test('settings writes remain readable and preserve the existing account choices'
  const ui=await boot(t);
  await ui.invoke('position','left');await ui.invoke('visibility','always');
  const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'settings.json'),'utf8'));
- assert.deepEqual(saved,{enabled:[],position:'left',visibility:'always'});
+ assert.deepEqual(saved,{enabled:[],position:'left',visibility:'always',alerts:true,alertSeconds:10});
  assert.equal(fs.existsSync(path.join(ui.directory,'settings.json.tmp')),false);
+});
+
+const flush=async()=>{for(let i=0;i<5;i++)await Promise.resolve();};
+test('a limit reaching 90% brings a hidden notch out for the chosen time, then hides it again',async t=>{
+ let percent=40;
+ const ui=await boot(t,{visibility:'hidden',enabled:['claude'],saved:{alertSeconds:7},usage:()=>[{label:'Session',percent,reset:null}]});
+ await flush();const window=ui.windows[0];
+ assert.equal(window.visible,false);assert.equal(ui.state().alerting,false);
+ percent=93;await ui.intervals.values().next().value();await flush();
+ assert.equal(window.visible,true,'comes out of hidden mode');assert.equal(window.ignoresMouse,false);
+ assert.equal(ui.state().alerting,true);assert.equal(ui.state().accounts[0].level,'warning');
+ assert.ok(window.bounds.height>80,'opens rather than showing the folded pill');
+ // Still high on the next refresh: no second alert once this one ends.
+ ui.runTimers();assert.equal(window.visible,false,'returns to hidden');assert.equal(ui.state().alerting,false);
+ await ui.intervals.values().next().value();await flush();assert.equal(window.visible,false);
+});
+test('on hover the alert opens the notch and folds it back afterwards',async t=>{
+ const ui=await boot(t,{enabled:['claude'],usage:()=>[{label:'Session',percent:100,reset:null}]});
+ await flush();const window=ui.windows[0];
+ assert.equal(ui.state().alerting,true);assert.equal(ui.state().accounts[0].level,'critical');
+ const open=window.bounds;assert.ok(open.width>10);
+ ui.runTimers();assert.equal(ui.state().alerting,false);assert.equal(window.visible,true);
+ assert.equal(window.bounds.width,10,'folded back to the edge pill');
+});
+test('alerts can be turned off and the duration is saved clamped',async t=>{
+ const ui=await boot(t,{visibility:'hidden',enabled:['claude'],saved:{alerts:false},usage:()=>[{label:'Session',percent:95,reset:null}]});
+ await flush();assert.equal(ui.windows[0].visible,false);assert.equal(ui.state()?.alerting??false,false);
+ await ui.invoke('alerts',{enabled:true,seconds:500});
+ const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'settings.json'),'utf8'));
+ assert.equal(saved.alerts,true);assert.equal(saved.alertSeconds,60);
 });

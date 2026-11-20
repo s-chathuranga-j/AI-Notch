@@ -9,10 +9,10 @@ function setup(){
   replaceChildren(){this.children=[];}
   setAttribute(key,value){this.attributes[key]=value;}
  }
- const ids=Object.fromEntries(['settings','preferences','position','visibility','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
+ const ids=Object.fromEntries(['settings','preferences','position','visibility','alerts','alert-seconds','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
  const body=new Element();const calls=[];let callback;let delayed;
  const state={settings:false,expanded:false,position:'left',demo:true,accounts:['claude','codex'].map(id=>({id,kind:id,label:id,enabled:true,status:'Updated',windows:[{label:'Session',percent:25}],updated:Date.now()}))};
- const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){},startup:on=>{calls.push(['startup',on]);return Promise.resolve();}};
+ const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){},alerts:value=>calls.push(['alerts',value]),startup:on=>{calls.push(['startup',on]);return Promise.resolve();}};
  vm.runInNewContext(fs.readFileSync(require.resolve('../src/renderer.js'),'utf8'),{notchPath:require('../src/notch-shape.js').notchPath,document:{body,getElementById:id=>ids[id],createElement:()=>new Element(),createElementNS:()=>new Element(),addEventListener(){}},window:{notch,innerWidth:420,innerHeight:400,addEventListener(){}},setTimeout:fn=>{delayed=fn;return 1;},clearTimeout:()=>{delayed=null;}});
  return {ids,body,calls,state,push:callback,leave:()=>{body.onmouseleave();delayed?.();}};
 }
@@ -76,4 +76,22 @@ test('a stale reading has an empty ring and dated history in details',()=>{
  assert.equal(row.children.find(c=>c.className==='meter').children[1].textContent,'25%');
  assert.ok(!ui.ids.accounts.children[1].className,'a healthy account is not flagged');
  assert.ok(!ui.ids.compact.children[1].className.includes('stale'));
+});
+test('an alert holds the notch open, colours the chip and hands hover back when it ends',()=>{
+ const ui=setup();
+ const high={...ui.state,alerting:true,visibility:'hidden',accounts:ui.state.accounts.map((a,i)=>i?a:{...a,level:'warning',windows:[{label:'Session',percent:92}]})};
+ ui.push(high);
+ assert.ok(ui.body.classes.has('expanded'));assert.ok(ui.body.classes.has('alerting'));
+ assert.match(ui.ids.compact.children[0].className,/level-warning/);
+ assert.match(ui.ids.accounts.children[0].children[1].className,/level-warning/);
+ ui.leave();assert.ok(ui.body.classes.has('expanded'),'leaving does not fold it during the alert');
+ assert.deepEqual(ui.calls.at(-1),['expand',false]);
+ ui.push({...high,alerting:false,expanded:false});
+ assert.ok(!ui.body.classes.has('expanded'),'folds once the alert ends');
+});
+test('alert settings are shown and sent',()=>{
+ const ui=setup();ui.push({...ui.state,settings:true,alerts:true,alertSeconds:15});
+ assert.equal(ui.ids.alerts.checked,true);assert.equal(ui.ids['alert-seconds'].value,'15');
+ ui.ids['alert-seconds'].onchange({target:{value:'20'}});assert.equal(JSON.stringify(ui.calls.at(-1)),JSON.stringify(['alerts',{seconds:20}]));
+ ui.ids.alerts.onchange({target:{checked:false}});assert.equal(JSON.stringify(ui.calls.at(-1)),JSON.stringify(['alerts',{enabled:false}]));
 });
