@@ -104,3 +104,12 @@ input[type=time]{width:auto;height:auto;font:inherit;font-size:11px;padding:4px 
 input[type=time]:disabled{opacity:.5}
 .ring-pick{margin-left:auto;padding:3px 6px;font-size:11px}
 input[type=time]::-webkit-calendar-picker-indicator{display:none}
+input[type=checkbox]{appearance:none;display:inline-grid;place-content:center;width:18px;height:18px;border:1.5px solid #8d96a8;border-radius:5px;background:#1b1e25;transition:background .12s,border-color .12s}
+input[type=checkbox]::after{content:"";width:10px;height:6px;border-left:2px solid #14121c;border-bottom:2px solid #14121c;transform:rotate(-45deg) translate(1px,-1px);opacity:0}
+input[type=checkbox]:checked{background:#b8a4ef;border-color:#b8a4ef}
+input[type=checkbox]:checked::after{opacity:1}
+input[type=checkbox]:disabled{opacity:.45;cursor:default}
+.chip input[type=checkbox]{width:14px;height:14px}
+.chip input[type=checkbox]::after{width:7px;height:4px}
+.update-actions{display:flex;gap:6px}
+#update-status:empty,#startup-status:empty{display:none}

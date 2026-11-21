@@ -252,3 +252,16 @@ test('history left behind by a disabled account is removed at startup',async t=>
  const saved=JSON.parse(fs.readFileSync(path.join(ui.directory,'history.json'),'utf8'));
  assert.equal(saved.series['gone\u001fSession'],undefined);assert.ok(saved.series['claude\u001fSession']);
 });
+test('startup state follows our own Run entry when Windows lists it',async t=>{
+ const ui=await boot(t);
+ ui.app.getLoginItemSettings=()=>({openAtLogin:false,executableWillLaunchAtLogin:false,launchItems:[{name:'AI Notch',path:ui.processMock.execPath,args:['--startup'],scope:'user',enabled:true}]});
+ await ui.invoke('position','left');assert.equal(ui.state().startWithWindows,true);
+ assert.match(ui.state().startupError,/^$/);
+ ui.app.getLoginItemSettings=()=>({openAtLogin:true,executableWillLaunchAtLogin:false,launchItems:[{name:'AI Notch',path:ui.processMock.execPath,args:['--startup'],scope:'user',enabled:false}]});
+ await ui.invoke('position','top');assert.equal(ui.state().startWithWindows,false);assert.match(ui.state().startupError,/Turned off in Windows Settings/);
+});
+test('a startup change Windows does not keep is reported',async t=>{
+ const ui=await boot(t);
+ ui.app.setLoginItemSettings=()=>{};
+ ui.invoke('startup',true);assert.match(ui.state().startupError,/did not keep/);
+});

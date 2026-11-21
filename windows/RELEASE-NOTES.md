@@ -2,6 +2,8 @@
 
 - **Claude Enterprise credits.** Accounts billed by credits have no session or weekly limits, so nothing reached the status line and Claude showed no usage. AI Notch now falls back to the Claude Code login and shows monthly credit use as **Credits**. The status line reading is still used first whenever it exists.
 - **Work label.** Enterprise and Team logins are labelled **Claude · Work**. Saved settings and history carry over unchanged.
+- **Start with Windows fixed.** The setting now reads back AI Notch's own startup entry, shows **On** or **Off** under the checkbox, and says when Windows Settings has turned it off or did not keep a change. Checkboxes have a visible outline and tick.
+- **Check for updates.** A button in Settings asks GitHub for the latest Windows release, only when you press it, and opens its download page if it is newer.
 
 The Setup EXE selects the native x64 or ARM64 version. Portable ZIPs and SHA-256 checksums are included. This is an unsigned preview.
 
