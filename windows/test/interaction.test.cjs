@@ -9,7 +9,7 @@ function setup(){
   replaceChildren(){this.children=[];}
   setAttribute(key,value){this.attributes[key]=value;}
  }
- const ids=Object.fromEntries(['settings','preferences','position','visibility','alerts','alert-seconds','t75','t90','t100','pace','quiet','quiet-start','quiet-end','notifications','shortcut','shortcut-status','display','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
+ const ids=Object.fromEntries(['settings','preferences','position','visibility','alerts','alert-seconds','t75','t90','t100','pace','quiet','quiet-start','quiet-end','notifications','shortcut','shortcut-status','display','check-updates','download-update','update-status','startup','startup-status','notch-outline','mode','accounts','compact','footer','retry'].map(id=>[id,new Element()]));
  const body=new Element();const calls=[];let callback;let delayed;
  const state={settings:false,expanded:false,position:'left',demo:true,accounts:['claude','codex'].map(id=>({id,kind:id,label:id,enabled:true,status:'Updated',windows:[{label:'Session',percent:25}],updated:Date.now()}))};
  const notch={onState:fn=>callback=fn,state:()=>({then:fn=>fn(state)}),detail:id=>calls.push(['detail',id]),expand:on=>calls.push(['expand',on]),settings:()=>calls.push(['settings']),retry(){},position(){},visibility(){},alerts:value=>calls.push(['alerts',value]),shortcut:value=>calls.push(['shortcut',value]),display:value=>calls.push(['display',value]),ring:(id,value)=>calls.push(['ring',id,value]),startup:on=>{calls.push(['startup',on]);return Promise.resolve();}};

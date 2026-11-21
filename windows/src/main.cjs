@@ -1,5 +1,6 @@
 const electron=require('electron');
-const {app,BrowserWindow,Tray,Menu,ipcMain,screen,session,powerMonitor,dialog,clipboard,Notification,globalShortcut}=electron;
+const {app,BrowserWindow,Tray,Menu,ipcMain,screen,session,powerMonitor,dialog,clipboard,Notification,globalShortcut,shell}=electron;
+const {checkForUpdates,RELEASE_PAGE}=require('./updates.cjs');
 const fs=require('node:fs/promises');const path=require('node:path');const os=require('node:os');
 const {discover,Poller,fetchUsage,claudeStatusLineSettings,claudeReadingFile}=require('./providers.cjs');
 const {notchBounds}=require('./layout.cjs');
@@ -13,6 +14,7 @@ const demo=process.platform!=='win32'||process.argv.includes('--demo');
 const icon=path.join(__dirname,process.platform==='win32'?'assets/app.ico':'tray.png');
 const VISIBILITIES=['onHover','always','hidden'];
 const loginOptions={path:process.execPath,args:['--startup']};
+const STARTUP_NAME='AI Notch';
 let win,tray,wakeTimer,refreshTimer,alertTimer,historyTimer,startupError='',shortcutError='',lastRendererRecovery=0,alerting=false,alertKind=null;
 const alerts=new AlertTracker(),notices=new Map();
 let history=new History();
@@ -22,7 +24,16 @@ function log(event,code){record(app.getPath('userData'),event,code);}
 function startupState(){
  const startupAvailable=process.platform==='win32'&&app.isPackaged&&!demo;
  if(!startupAvailable)return {startupAvailable:false,startWithWindows:false,startupError:''};
- try{return {startupAvailable:true,startWithWindows:app.getLoginItemSettings(loginOptions).executableWillLaunchAtLogin,startupError};}
+ try{
+  const settings=app.getLoginItemSettings(loginOptions);
+  // Our own Run entry, by the name it was written under, is the most direct answer; the executable
+  // check is the fallback for entries Windows reports differently.
+  const ours=(settings.launchItems||[]).find(item=>item.name===STARTUP_NAME);
+  // openAtLogin is not used: it ignores the Startup apps switch in Windows Settings.
+  const on=ours?ours.enabled!==false:!!settings.executableWillLaunchAtLogin;
+  const blocked=ours&&ours.enabled===false;
+  return {startupAvailable:true,startWithWindows:on,startupError:startupError||(blocked?'Turned off in Windows Settings > Apps > Startup. Turn AI Notch on there, or tick the box again.':'')};
+ }
  catch{return {startupAvailable:false,startWithWindows:false,startupError:'Windows startup settings could not be read.'};}
 }
 function forecastFor(id,w){return Number.isFinite(w.percent)?forecast(history.samples(id,w.label),Date.now(),w.reset):null;}
@@ -242,6 +253,8 @@ if(!app.requestSingleInstanceLock())app.quit();else {
    return true;
   });
   ipcMain.handle('retry',event=>{if(valid(event))return refresh();});
+  ipcMain.handle('check-updates',async event=>valid(event)?checkForUpdates(app.getVersion()):null);
+  ipcMain.handle('open-release',(event,url)=>{if(valid(event)&&typeof url==='string'&&RELEASE_PAGE.test(url))return shell?.openExternal(url);});
   ipcMain.handle('position',async(event,value)=>{if(valid(event)&&['top','bottom','left','right'].includes(value)){config.position=value;await save();place();push();}});
   ipcMain.handle('visibility',async(event,value)=>{if(valid(event)&&VISIBILITIES.includes(value)){config.visibility=value;expanded=value==='always';detailId=null;endAlert();await save();place();push();}});
   ipcMain.handle('alerts',async(event,value)=>{
@@ -259,7 +272,8 @@ if(!app.requestSingleInstanceLock())app.quit();else {
   ipcMain.handle('ring',async(event,id,value)=>{if(valid(event)&&accounts.some(a=>a.id===id)&&typeof value==='string'&&value.length<64){if(value==='auto')delete config.ring[id];else config.ring[id]=value;await save();push();}});
   ipcMain.handle('startup',(event,value)=>{
    if(!valid(event)||typeof value!=='boolean'||!startupState().startupAvailable)return;
-   try{app.setLoginItemSettings({...loginOptions,name:'AI Notch',openAtLogin:value,enabled:value});startupError='';}
+   try{app.setLoginItemSettings({...loginOptions,name:STARTUP_NAME,openAtLogin:value,enabled:value});startupError='';
+    if(startupState().startWithWindows!==value)startupError='Windows did not keep this change. Check Settings > Apps > Startup.';}
    catch{startupError='Windows could not change startup settings. Check Settings → Apps → Startup.';}
    push();
   });

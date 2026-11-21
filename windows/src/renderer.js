@@ -87,7 +87,7 @@ function render(state){
  // A saved display that is no longer connected falls back to the main one, as the notch does.
  display.value=list.some(d=>d.id===state.display)?state.display:'primary';display.disabled=!list.length;
  $('startup').checked=!!state.startWithWindows;$('startup').disabled=!state.startupAvailable;
- $('startup-status').textContent=state.startupError||(state.startupAvailable?'':'Available in the installed Windows app.');
+ $('startup-status').textContent=state.startupError||(state.startupAvailable?(state.startWithWindows?'On. AI Notch starts when you sign in to Windows.':'Off.'):'Available in the installed Windows app.');
  $('mode').textContent=state.demo?'Preview · sample data':'Subscription usage';
  $('accounts').replaceChildren();$('compact').replaceChildren();
  for(const a of state.accounts){
@@ -165,6 +165,15 @@ function collapse(){if(current?.settings||current?.visibility==='always')return;
 $('settings').onmouseenter=()=>{if(!current?.settings&&selected!==null){selected=null;updateView();window.notch.detail(null);}};
 $('settings').onclick=()=>{clearTimeout(timer);window.notch.settings();};
 $('retry').onclick=()=>window.notch.retry();
+let releaseURL=null;
+$('check-updates').onclick=async()=>{
+ $('check-updates').disabled=true;$('update-status').textContent='Checking…';$('download-update').hidden=true;
+ const result=await window.notch.checkUpdates().catch(()=>null);
+ $('check-updates').disabled=false;
+ $('update-status').textContent=result?.message||'Could not check for updates. Try again later.';
+ releaseURL=result?.state==='available'?result.url:null;$('download-update').hidden=!releaseURL;
+};
+$('download-update').onclick=()=>{if(releaseURL)window.notch.openRelease(releaseURL);};
 $('position').onchange=e=>window.notch.position(e.target.value);
 $('visibility').onchange=e=>window.notch.visibility(e.target.value);
 $('alerts').onchange=e=>window.notch.alerts({enabled:e.target.checked});
