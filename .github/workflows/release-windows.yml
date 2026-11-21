@@ -1,6 +1,6 @@
 name: Release Windows
 
-# Builds the Setup EXE and portable ZIPs on Windows and drafts a GitHub release.
+# Builds the Setup EXE and portable ZIPs on Windows and publishes a GitHub release.
 # Runs when Windows changes land on main and no release exists yet for the
 # version in windows/package.json, on a windows-vX.Y.Z tag, or from the Actions
 # tab, and publishes the release.
