@@ -3,7 +3,7 @@ name: Release Windows
 # Builds the Setup EXE and portable ZIPs on Windows and drafts a GitHub release.
 # Runs when Windows changes land on main and no release exists yet for the
 # version in windows/package.json, on a windows-vX.Y.Z tag, or from the Actions
-# tab. The draft is published by hand after checking it.
+# tab, and publishes the release.
 on:
   push:
     tags: ['windows-v*']
@@ -85,7 +85,8 @@ jobs:
             windows/dist/SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          # Published directly: the release is only built after tests pass on a Windows runner.
+          draft: false
           tag_name: windows-v${{ steps.meta.outputs.version }}
           target_commitish: ${{ steps.meta.outputs.sha }}
           name: AI Notch for Windows v${{ steps.meta.outputs.version }}
