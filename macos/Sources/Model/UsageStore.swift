@@ -479,9 +479,7 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    /// Why an expired Claude token leaves the ring stale. Not "signed out":
-    /// the token is short-lived and Claude Code renews it on its own.
-    nonisolated static let expiredTokenReason = "Claude Code’s sign-in token has expired. It renews by itself the next time you use Claude Code, and AI Notch updates within a minute — no password needed."
+    nonisolated static let expiredTokenReason = "Claude Code’s access token has expired. Open Claude Code to renew it. If Claude asks you to sign in, complete sign-in there."
 
     /// Why a rate-limited provider is stale, and when the next try is.
     nonisolated static func rateLimitedReason(provider: String, retryAt: Date,

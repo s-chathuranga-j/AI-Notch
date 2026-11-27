@@ -45,8 +45,8 @@ final class ClaudeKeychainFallbackTests: XCTestCase {
         XCTAssertTrue(reason.contains("10:42"), reason)
     }
 
-    func testExpiredTokenReasonDoesNotSendPeopleToSignIn() {
-        XCTAssertFalse(UsageStore.expiredTokenReason.contains("/login"))
-        XCTAssertTrue(UsageStore.expiredTokenReason.contains("no password needed"))
+    func testExpiredTokenReasonExplainsManualRecovery() {
+        XCTAssertTrue(UsageStore.expiredTokenReason.contains("Open Claude Code"))
+        XCTAssertTrue(UsageStore.expiredTokenReason.contains("If Claude asks you to sign in"))
     }
 }

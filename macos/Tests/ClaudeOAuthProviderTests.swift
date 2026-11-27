@@ -144,9 +144,61 @@ final class ClaudeOAuthProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.status.staleSince, fetchedAt)
         XCTAssertNil(snapshot.ringFraction)
         XCTAssertTrue(snapshot.statusMessage?.contains("token has expired") == true)
-        XCTAssertTrue(snapshot.statusMessage?.contains("next time you use Claude Code") == true)
-        XCTAssertFalse(snapshot.statusMessage?.contains("/login") == true)
+        XCTAssertTrue(snapshot.statusMessage?.contains("Open Claude Code") == true)
         XCTAssertTrue(snapshot.statusMessage?.contains("Last reading: 100%") == true)
+    }
+
+    @MainActor
+    func testExpiredTokenRenewsAndUpdatesTheRingInTheSameRefresh() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "ClaudeRenewalTests.\(UUID())"))
+        let archive = UsageArchive(defaults: defaults)
+        let source = CredentialSource(readable: false)
+        let provider = ClaudeOAuthProvider(session: StubEndpoint.session(), archive: archive,
+                                           renewCredential: {
+            source.makeReadable()
+            return true
+        }, loadCredentials: {
+            do { return try source.read() }
+            catch { throw UsageProviderError.credentialExpired }
+        })
+        StubEndpoint.reset([.init(status: 200, body: Self.usagePayload)])
+        let store = UsageStore(providers: [provider], archive: archive)
+
+        await store.refresh()
+
+        XCTAssertEqual(store.snapshots.first?.ringFraction, 0.42)
+        XCTAssertEqual(source.reads, 2)
+        XCTAssertEqual(StubEndpoint.requestCount, 1)
+    }
+
+    func testRenewalSuppliesATerminalAndStopsTheProcessAfterTheMarkerChanges() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("claude")
+        let marker = directory.appendingPathComponent("renewed")
+        try """
+        #!/bin/sh
+        [ -t 0 ] && [ -t 1 ] && [ -t 2 ] || exit 1
+        printf '%s\\n%s' "$$" "$CLAUDE_CONFIG_DIR" > "${0%/*}/renewed"
+        while :; do :; done
+        """.write(to: executable, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
+
+        for profile in [ClaudeProfile.default(), ClaudeProfile(slug: "test", configDirectory: directory)] {
+            let renewed = try await ClaudeTokenRenewal.run(profile: profile, executable: executable,
+                                                          timeout: .seconds(3)) {
+                (try? String(contentsOf: marker, encoding: .utf8))?.contains("\n") == true
+            }
+
+            XCTAssertTrue(renewed)
+            let fields = try String(contentsOf: marker, encoding: .utf8).components(separatedBy: "\n")
+            let pid = try XCTUnwrap(fields.first.flatMap(Int32.init))
+            XCTAssertEqual(fields.last, profile.slug == nil ? "" : directory.path)
+            XCTAssertEqual(kill(pid, 0), -1)
+            XCTAssertEqual(errno, ESRCH)
+            try FileManager.default.removeItem(at: marker)
+        }
     }
 
     func testStatusLineSkipsDirectRefreshUntilTheReadingIsStale() async throws {

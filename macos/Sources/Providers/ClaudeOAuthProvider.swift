@@ -34,6 +34,8 @@ actor ClaudeOAuthProvider: UsageProvider, ChangeSignalling {
     /// How many 429s in a row. The endpoint answers `Retry-After: 0`, which is
     /// no guidance at all, so the wait doubles each time instead.
     private var consecutiveRateLimits = 0
+    private var nextRenewalAttempt: ContinuousClock.Instant?
+    private let renewCredential: @Sendable () async throws -> Bool
 
     private let archive: UsageArchive
     /// How this profile's token is obtained. Injected for the same reason
@@ -46,6 +48,7 @@ actor ClaudeOAuthProvider: UsageProvider, ChangeSignalling {
          session: URLSession = ProviderHTTP.session(),
          archive: UsageArchive = UsageArchive(),
          preferStatusLine: Bool = false,
+         renewCredential: (@Sendable () async throws -> Bool)? = nil,
          loadCredentials: (@Sendable () throws -> ClaudeCredentials)? = nil) {
         self.profile = profile
         self.id = profile.id
@@ -54,6 +57,10 @@ actor ClaudeOAuthProvider: UsageProvider, ChangeSignalling {
         self.keychain = keychain
         self.preferStatusLine = preferStatusLine
         self.loadCredentials = loadCredentials ?? { try keychain.load(allowingInteraction: preferStatusLine) }
+        self.renewCredential = renewCredential ?? {
+            guard loadCredentials == nil else { return false }
+            return try await ClaudeTokenRenewal.run(profile: profile)
+        }
         self.session = session
         self.archive = archive
         // Pick the back-off back up where the last run left it, so relaunching
@@ -82,7 +89,21 @@ actor ClaudeOAuthProvider: UsageProvider, ChangeSignalling {
             throw UsageProviderError.rateLimited(retryAfter: remaining)
         }
         do {
-            let snapshot = try await fetch(retryingOnUnauthorized: true)
+            let snapshot: ProviderSnapshot
+            do {
+                snapshot = try await fetch(retryingOnUnauthorized: true)
+            } catch UsageProviderError.credentialExpired {
+                try Task.checkCancellation()
+                let now = ContinuousClock.now
+                guard nextRenewalAttempt.map({ now >= $0 }) ?? true else {
+                    throw UsageProviderError.credentialExpired
+                }
+                nextRenewalAttempt = now.advanced(by: .seconds(15 * 60))
+                guard try await renewCredential() else { throw UsageProviderError.credentialExpired }
+                try Task.checkCancellation()
+                snapshot = try await fetch(retryingOnUnauthorized: true)
+            }
+            nextRenewalAttempt = nil
             retryNoEarlierThan = nil
             consecutiveRateLimits = 0
             archive.saveBackoffUntil(nil, providerID: id)
@@ -97,7 +118,7 @@ actor ClaudeOAuthProvider: UsageProvider, ChangeSignalling {
             // the keychain was never read again.
             throw UsageProviderError.needsAuth
         } catch UsageProviderError.credentialExpired {
-            Log.usage.notice("Claude Code sign-in expired")
+            Log.usage.notice("Claude Code access token expired")
             throw UsageProviderError.credentialExpired
         } catch let error as UsageProviderError {
             if case .rateLimited(let retryAfter) = error {

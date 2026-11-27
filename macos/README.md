@@ -71,6 +71,8 @@ Claude's profile configuration is documented in the [official environment-variab
 2. Merge the copied `statusLine` entry into `~/.claude/settings.json`. For a work profile, use its own settings file (for example, `~/.claude-work/settings.json`) and copy the command from that profile’s row.
 3. Use Claude Code normally. Its [status line](https://code.claude.com/docs/en/statusline#rate-limit-usage) receives five-hour and weekly usage after the first API response in a session. AI Notch updates on its next refresh and marks old readings stale while Claude Code is idle.
 
+When AI Notch detects an expired Claude Code access token, it briefly starts the matching Claude Code profile in the background to let Claude renew the token. This opens no Terminal window and sends no model prompt. macOS may ask AI Notch for Keychain access. If the underlying Claude sign-in has ended, sign in again in Claude Code.
+
 If you already have a status line, keep its settings and add the collector to that script. For a shell script, read stdin once, then pass it independently to the AI Notch command and your existing status line logic. Copy the command for your profile from AI Notch and substitute it for the placeholder below:
 
 ```sh
